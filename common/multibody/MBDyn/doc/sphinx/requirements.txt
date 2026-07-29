@@ -1,0 +1,2 @@
+Sphinx>=8.1,<9
+sphinxcontrib-fulltoc>=1.2
