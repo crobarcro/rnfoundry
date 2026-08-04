@@ -31,7 +31,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %
 %    thetam - angular pitch of magnet in radians
 %
-%    thetac - angular pitch of coil slot, this can be a single value or two 
+%    thetac - angular pitch of coil slot, this can be a single value or two
 %      values. If two values, it is the pitch at the base (close to
 %      armature yoke) and top (close to slot opening) of the slot
 %      respectively. If this is a single value, the same pitch is used for
@@ -40,7 +40,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %    thetasg - angular pitch of the coil slot opening between shoes.
 %
 %    ls - stack length (depth 'into the page' of simulation)
-% 
+%
 % In general, all dimensions which refer to a radial measurement from the
 % center of the machine are prefixed with the capital letter 'R'.
 %
@@ -62,7 +62,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %    Ryo - radial distance to armature yoke outer surface
 %
 %
-% For an EXTERNAL ARMATURE machine, the design structure must also contain the 
+% For an EXTERNAL ARMATURE machine, the design structure must also contain the
 % fields:
 %
 %    Ryo - radial distance to armature yoke outer surface
@@ -93,14 +93,14 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %  yp - Average coil pitch as defined by (Qs/Poles)
 %  yd - Actual coil pitch as defined by round(yp) +/- k
 %  Qs  -  total number of stator slots in machine
-%  Qc  -  total number of winding coils in machine 
+%  Qc  -  total number of winding coils in machine
 %  q  -  number of slots per pole and phase
 %  qn  -  numerator of q
 %  qd  -  denominator of q
 %  qc - number of coils per pole and phase
 %  qcn  -  numerator of qc
 %  qcd  -  denominator of qc
-%  Qcb - basic winding (the minimum number of coils required to make up a 
+%  Qcb - basic winding (the minimum number of coils required to make up a
 %    repetitive segment of the machine that can be modelled using symmetry)
 %  pb - the number of poles corresponding to the basic winding in Qcb
 %  CoilLayers - number of layers in the winding
@@ -165,12 +165,12 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %    separate. Defaults to 1e-5 if not supplied.
 %
 %
-% SIMOPTIONS 
+% SIMOPTIONS
 %
 % Also expected to be provided is a structure containing various simulation
 % options.
 %
-%  GetVariableGapForce - optional flag determining if a series of force 
+%  GetVariableGapForce - optional flag determining if a series of force
 %   simulations with various air gap sizes will be performed. Must be supplied.
 %
 %  NForcePoints - optional number of gap sizes to use if GetVariableGapForce is
@@ -209,7 +209,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %      otherwise, mfemm will be used if it is available. Defaults to false
 %      if not supplied.
 %
-%    QuietFemm : optional flag determining if output to the command line 
+%    QuietFemm : optional flag determining if output to the command line
 %      from mfemm should be suppressed. Defaults to true if not supplied.
 %
 %
@@ -221,7 +221,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %   simulations. This can be desirable when only coil winding configurations
 %   change etc. Defaults to false if not supplied.
 %
-%  
+%
 %
 % [1] J. J. Germishuizen and M. J. Kamper, "Classification of symmetrical
 % non-overlapping three-phase windings," in The XIX International
@@ -232,22 +232,28 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
 %           simfun_AM.m, fr.m
 %
 %
-    
+
     if nargin == 0
         % return the internal subfunctions
         design = [feasim_RADIAL_SLOTTED(), {@coilresistance}];
         return;
     end
-    
+
     if design.ypd ~= 1 && design.ypd ~= 2
     	error('denominator of slots per pole must be 1 or 2, other values not yet supported')
     end
-    
+
     simoptions = setfieldifabsent (simoptions, 'DoBackIronCoreLoss', false);
     if ~isfield(simoptions, 'MagFEASim')
         simoptions.MagFEASim = struct();
     end
-    simoptions.MagFEASim = setfieldifabsent (simoptions.MagFEASim, 'RotationMethod', 'MagnetRedraw');
+    if ~isfield(simoptions.MagFEASim, 'RotationMethod')
+        if simoptions.MagFEASim.SolveMethod == 'femmsession'
+            simoptions.MagFEASim.RotationMethod = 'SlidingMesh';
+        else
+            simoptions.MagFEASim.RotationMethod = 'MagnetRedraw';
+        end
+    end
 
     if ~isfield(design, 'CoreLoss')
         % CoreLoss will be the armature back iron data
@@ -255,17 +261,17 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
           design.CoreLoss.kc, ...
           design.CoreLoss.ke, ...
           design.CoreLoss.beta ] = corelosscoeffs ('M-36', '26', 'InterpolateMissing', false);
-      
+
         if simoptions.DoBackIronCoreLoss
             % CoreLoss will be the armature back iron data
             design.CoreLoss(end+1).kh = mean ([7.54, 22.61] * 1e2);
             design.CoreLoss(end+1).kc = design.CoreLoss.kc;
             design.CoreLoss(end+1).ke = 0;
-            design.CoreLoss(end+1).beta = 2; 
+            design.CoreLoss(end+1).beta = 2;
         end
     end
-    
-    % We don't check the coil turns etc at this stage (done by default in 
+
+    % We don't check the coil turns etc at this stage (done by default in
     % simfun_RADIAL) as we don't yet know the coil cross-sectional area, this is
     % done later below
     simoptions.SkipCheckCoilProps = true;
@@ -276,10 +282,10 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         design.CoilTurns = 1;
         rmcoilturns = true;
     end
-    
+
     % call the common radial simulation function
     [design, simoptions] = simfun_RADIAL (design, simoptions);
-    
+
     if design.tsg > 1e-5
         if design.tsb > 1e-5
             simoptions.MagFEASim = ...
@@ -304,19 +310,19 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
                                   'ShoeGapRegionMeshSize', -1);
         end
     end
-    
+
     % now get the flux linkage in the coils, we will do this by getting the
     % integral of the vector potential in a slot at a range of rotor
     % positions
-    
+
     % choose an appropriate number of pole pairs for the simulation based
     % on the basic winding
     NPolePairs = max(1, ceil (design.pb/2));
-    
+
     if ~simoptions.SkipMainFEA
-    
+
         simoptions = setfieldifabsent (simoptions, 'NMagFEAPositions', 10);
-        
+
     %     design.FirstSlotCenter = design.thetap + (design.thetap / slotsperpole / 2);
         design.FirstSlotCenter = 0;
         feapos = linspace (0, 1, simoptions.NMagFEAPositions);
@@ -328,7 +334,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         % The dot product of orthogonal vectors is zero. In two dimensions the
         % slopes of perpendicular lines are negative reciprocals. Switch the x
         % and y coefficients and change the sign of one of them.
-        % 
+        %
         % For vector V1 = <a, b>, the reciprocal V2 = <b, -a>. Now make it a
         % unit vector by dividing by the magnitude.
 %         coggingvector = unit([gvector(2), -gvector(1)]);
@@ -336,6 +342,8 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         femfilename = [tempname(), '_simfun_RADIAL_SLOTTED.fem'];
 
         fprintf (1, 'Performing FEA simulation %d of %d\n', 1, simoptions.NMagFEAPositions);
+
+
         [ RawCoggingTorque, ...
           BxCoreLossData, ...
           ByCoreLossData, ...
@@ -345,12 +353,14 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
           slotIntA, ...
           BslotPos, ...
           slotIntB, ...
-          design ] = feasim_RADIAL_SLOTTED (design, simoptions, design.thetap * feapos(1), ...
+          design, ...
+          session ] = feasim_RADIAL_SLOTTED (design, simoptions, design.thetap * feapos(1), ...
                                             'IsInitialisation', true, ...
                                             'NPolePairs', NPolePairs, ...
                                             'RotationMethod', simoptions.MagFEASim.RotationMethod, ...
-                                            'FemFileName', femfilename);
-        
+                                            'FemFileName', femfilename, ...
+                                            'SolveMethod', simoptions.MagFEASim.SolveMethod);
+
         parameterCell{1} = { RawCoggingTorque, ...
                              BxCoreLossData, ...
                              ByCoreLossData, ...
@@ -358,44 +368,22 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
                              FemmDirectFluxLinkage, ...
                              AslotPos, slotIntA, ...
                              BslotPos, slotIntB };
-	
+
+        reuseFemmSession = strcmpi (simoptions.MagFEASim.SolveMethod, 'femmsession') ...
+                           && strcmpi (simoptions.MagFEASim.RotationMethod, 'SlidingMesh');
+        if ~reuseFemmSession && isa (session, 'xfemm.femmsession')
+            delete (session);
+            session = [];
+        end
+
         simoptions.MagFEASim = setfieldifabsent ( simoptions.MagFEASim, 'UseParFor', false);
-        
+
         if simoptions.MagFEASim.UseParFor
-            
+
             parfor posind = 2:numel (feapos)
 
                 fprintf (1, 'Performing FEA simulation %d of %d\n', posind, simoptions.NMagFEAPositions);
-                
-                [ RawCoggingTorque, ...
-                  BxCoreLossData, ...
-                  ByCoreLossData, ...
-                  ArmatureToothFluxDensity, ...
-                  FemmDirectFluxLinkage, ...
-                  AslotPos, ...
-                  slotIntA, ...
-                  BslotPos, ...
-                  slotIntB ] = feasim_RADIAL_SLOTTED (design, simoptions, design.thetap * feapos(posind), ...
-                                                        'IsInitialisation', false, ...
-                                                        'NPolePairs', NPolePairs, ...
-                                                        'RotationMethod', simoptions.MagFEASim.RotationMethod);
 
-                parameterCell{posind} = { RawCoggingTorque, ...
-                                          BxCoreLossData, ...
-                                          ByCoreLossData, ...
-                                          ArmatureToothFluxDensity, ...
-                                          FemmDirectFluxLinkage, ...
-                                          AslotPos, slotIntA, ...
-                                          BslotPos, slotIntB };
-
-            end
-            
-        else
-            
-            for posind = 2:numel (feapos)
-
-                fprintf (1, 'Performing FEA simulation %d of %d\n', posind, simoptions.NMagFEAPositions);
-                
                 [ RawCoggingTorque, ...
                   BxCoreLossData, ...
                   ByCoreLossData, ...
@@ -408,7 +396,7 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
                                                         'IsInitialisation', false, ...
                                                         'NPolePairs', NPolePairs, ...
                                                         'RotationMethod', simoptions.MagFEASim.RotationMethod, ...
-                                                        'FemFileName', femfilename);
+                                                        'SolveMethod', simoptions.MagFEASim.SolveMethod);
 
                 parameterCell{posind} = { RawCoggingTorque, ...
                                           BxCoreLossData, ...
@@ -419,9 +407,53 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
                                           BslotPos, slotIntB };
 
             end
-        
+
+        else
+
+            for posind = 2:numel (feapos)
+
+                fprintf (1, 'Performing FEA simulation %d of %d\n', posind, simoptions.NMagFEAPositions);
+
+                femmSessionArgs = {};
+                if reuseFemmSession
+                    femmSessionArgs = {'FemmSession', session};
+                end
+
+                [ RawCoggingTorque, ...
+                  BxCoreLossData, ...
+                  ByCoreLossData, ...
+                  ArmatureToothFluxDensity, ...
+                  FemmDirectFluxLinkage, ...
+                  AslotPos, ...
+                  slotIntA, ...
+                  BslotPos, ...
+                  slotIntB, ...
+                  ~, ...
+                  session ] = feasim_RADIAL_SLOTTED (design, simoptions, design.thetap * feapos(posind), ...
+                                                        'IsInitialisation', false, ...
+                                                        'NPolePairs', NPolePairs, ...
+                                                        'RotationMethod', simoptions.MagFEASim.RotationMethod, ...
+                                                        'FemFileName', femfilename, ...
+                                                        'SolveMethod', simoptions.MagFEASim.SolveMethod, ...
+                                                        femmSessionArgs{:});
+
+                parameterCell{posind} = { RawCoggingTorque, ...
+                                          BxCoreLossData, ...
+                                          ByCoreLossData, ...
+                                          ArmatureToothFluxDensity, ...
+                                          FemmDirectFluxLinkage, ...
+                                          AslotPos, slotIntA, ...
+                                          BslotPos, slotIntB };
+
+                if ~reuseFemmSession && isa (session, 'xfemm.femmsession')
+                    delete (session);
+                    session = [];
+                end
+
+            end
+
         end
-        
+
         % consolidate the gathered data in the design structure
         design = assimilate_fea_data (design, simoptions, parameterCell);
 
@@ -431,14 +463,14 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         % different number of turns, and then multiply by the updated
         % number number of turns
         design.FemmDirectFluxLinkage = design.FemmDirectFluxLinkage / design.CoilTurns;
-        
+
     end % ~SkipMainFEA
-    
+
 
     if simoptions.GetVariableGapForce
-        
+
         if ~isfield (simoptions, 'VariableGapForcePositions')
-            
+
             % get more force points if requested
             pos = linspace (0, 0.9*design.g, simoptions.NForcePoints-1);
             pos(end+1) = 0.95*design.g;
@@ -446,14 +478,14 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
             simoptions.VariableGapForcePositions = pos;
 
         end
-        
+
         assert ( isnumeric (simoptions.VariableGapForcePositions) ...
                  && isvector (simoptions.VariableGapForcePositions), ...
                  'VariableGapForcePositions must be a numeric vector' );
-        
+
         simoptions = setfieldifabsent (simoptions, 'VariableGapForceDeleteFEMFiles', true);
         simoptions = setfieldifabsent (simoptions, 'VariableGapForceDeleteANSFiles', true);
-        
+
         tmpforce = closingforce_RADIAL_SLOTTED( design, ...
                                                 simoptions.VariableGapForcePositions, ...
                                                 'UseFemm', simoptions.MagFEASim.UseFemm, ...
@@ -464,25 +496,25 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         design.ForceGapClosingWithDisp = [0, tmpforce];
 
         design.DispGapClosingForce = [0, simoptions.VariableGapForcePositions];
-        
+
     end
 
-    
+
     % make sure the winding properties (number of turns etc.) are up to date
     if rmcoilturns
         design = rmfield (design, 'CoilTurns');
     end
     design = checkcoilprops_AM (design);
     design.FemmDirectFluxLinkage = design.FemmDirectFluxLinkage * design.CoilTurns;
-    
+
     if ~simoptions.SkipInductanceFEA
-        
+
         fprintf (1, 'Performing FEA simulation to determine inductance\n');
-    
+
         % perform an inductance sim to get the d axis inductance
         Lcurrent = inductancesimcurrent (design.CoilArea, design.CoilTurns);
         [design.InductanceFemmProblem, ~] = slottedLfemmprob_radial (design, ...
-            'FractionalPolePosition', -0.5 + (design.yd/2 * 1/design.qsp), ... + (1/design.qsp)/2, ... 
+            'FractionalPolePosition', -0.5 + (design.yd/2 * 1/design.qsp), ... + (1/design.qsp)/2, ...
             'NWindingLayers', design.CoilLayers, ...
             'CoilCurrent', [Lcurrent, 0, 0], ...
             'MagnetRegionMeshSize', simoptions.MagFEASim.MagnetRegionMeshSize, ...
@@ -493,12 +525,12 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
             'ShoeGapRegionMeshSize', simoptions.MagFEASim.ShoeGapRegionMeshSize, ...
             'YokeRegionMeshSize', simoptions.MagFEASim.YokeRegionMeshSize, ...
             'CoilRegionMeshSize', simoptions.MagFEASim.CoilRegionMeshSize);
-        
+
         % analyse the problem
         [ansfilename, femfilename] = analyse_mfemm ( design.InductanceFemmProblem, ...
                                                      simoptions.MagFEASim.UseFemm, ...
                                                      simoptions.MagFEASim.QuietFemm );
-        
+
         solution = fpproc (ansfilename);
         [design.CoilResistance, design.CoilInductance] = solution.circuitRL ('1');
         % get the mutual inductance by dividing the flux in a neighbouring
@@ -509,11 +541,11 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         clear solution;
 
         design.CoilInductance(2) = abs (temp(3)) / Lcurrent;
-        
+
         % clean up the FEA files
         delete (femfilename);
         delete (ansfilename);
-        
+
         % get the q axis inductance
         [design.QAxisInductanceFemmProblem, ~] = slottedLfemmprob_radial (design, ...
             'FractionalPolePosition', -0.25 + (design.yd/2 * 1/design.qsp), ...
@@ -527,12 +559,12 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
             'ShoeGapRegionMeshSize', simoptions.MagFEASim.ShoeGapRegionMeshSize, ...
             'YokeRegionMeshSize', simoptions.MagFEASim.YokeRegionMeshSize, ...
             'CoilRegionMeshSize', simoptions.MagFEASim.CoilRegionMeshSize);
-        
+
         % analyse the problem
         [ansfilename, femfilename] = analyse_mfemm ( design.QAxisInductanceFemmProblem, ...
                                                      simoptions.MagFEASim.UseFemm, ...
                                                      simoptions.MagFEASim.QuietFemm );
-        
+
         solution = fpproc (ansfilename);
         [~, design.QAxisCoilInductance] = solution.circuitRL ('1');
         % get the mutual inductance by dividing the flux in a neighbouring
@@ -543,30 +575,30 @@ function [design, simoptions] = simfun_RADIAL_SLOTTED(design, simoptions)
         clear solution;
 
         design.QAxisCoilInductance(2) = abs (temp(3)) / Lcurrent;
-        
+
         % clean up the FEA files
         delete (femfilename);
         delete (ansfilename);
-    
+
     end % ~simoptions.SkipInductanceFEA
-    
+
     % calculate coil mean turn lenth and resistance unless this is
     % overridden by settings in the simoptions structure
     if isfield (simoptions, 'set_MTL')
         design.MTL = simoptions.set_MTL;
     end
-    
+
     % now recalculate coil resistance
     if isfield (simoptions, 'set_CoilResistance')
         design.CoilResistance = simoptions.set_CoilResistance;
     else
         design = coilresistance_RADIAL_SLOTTED (design);
     end
-    
+
 end
 
 function design = assimilate_fea_data (design, simoptions, parameterCell)
-    
+
     ind_RawCoggingTorque = 1;
     ind_BxCoreLossData = 2;
     ind_ByCoreLossData = 3;
@@ -576,15 +608,15 @@ function design = assimilate_fea_data (design, simoptions, parameterCell)
     ind_intA_IntAData = 7;
     ind_intB_slotPos = 8;
     ind_intB_IntBData= 9;
-    
+
     design.intAdata.slotPos = [];
     design.intAdata.slotIntA = [];
     design.intBdata.slotPos = [];
     design.intBdata.slotIntB = [];
     design = setfieldifabsent (design, 'FemmDirectFluxLinkage', []);
-        
+
     for ind = 1:numel (parameterCell)
-        
+
         design.intAdata.slotPos = [design.intAdata.slotPos; parameterCell{ind}{ind_intA_slotPos}];
         design.intAdata.slotIntA = [design.intAdata.slotIntA; parameterCell{ind}{ind_intA_IntAData}];
         design.intBdata.slotPos = [design.intBdata.slotPos; parameterCell{ind}{ind_intB_slotPos}];
@@ -592,21 +624,21 @@ function design = assimilate_fea_data (design, simoptions, parameterCell)
         design.RawCoggingTorque(ind) = parameterCell{ind}{ind_RawCoggingTorque};
         design.ArmatureToothFluxDensity(ind) = parameterCell{ind}{ind_ArmatureToothFluxDensity};
         design.FemmDirectFluxLinkage(ind,:) = parameterCell{ind}{ind_FemmDirectFluxLinkage};
-        
+
         for ii = 1:numel(design.CoreLoss)
-        
+
             design.CoreLoss(ii).By(:,ind,:) = parameterCell{ind}{ind_ByCoreLossData}{ii};
-        
+
             design.CoreLoss(ii).Bx(:,ind,:) = parameterCell{ind}{ind_BxCoreLossData}{ii};
-            
+
         end
-        
+
     end
-    
+
     % sort the B integral data in ascending position order
     [design.intBdata.slotPos, idx] = sort (design.intBdata.slotPos);
     design.intBdata.slotIntB = design.intBdata.slotIntB(idx,:,:);
-    
+
     [design.intAdata.slotPos, idx] = sort (design.intAdata.slotPos);
     design.intAdata.slotIntA = design.intAdata.slotIntA(idx,:,:);
 
