@@ -19,7 +19,7 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 % specified in the field 'ArmatureType' which must contain a string, either
 % 'internal' or 'external'. Any unambiguous substring is also acceptable,
 % e.g 'e' or'i', or 'ext', or 'in'.
-% 
+%
 % In general, all dimensions which refer to a radial measurement from the
 % center of the machine are prefixed with the capital letter 'R'.
 %
@@ -44,10 +44,10 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 %
 %    thetam -  angular pitch of magnet in radians
 %
-%    thetacg - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacg - coil inner slot pitch in radians at the end of the coil closest
 %      to the slot opening
 %
-%    thetacy - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacy - coil inner slot pitch in radians at the end of the coil closest
 %      to the yoke
 %
 %    thetasg - angular pitch of the coil slot opening between shoes
@@ -90,10 +90,10 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 %
 %    thetam -  angular pitch of magnet in radians
 %
-%    thetacg - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacg - coil inner slot pitch in radians at the end of the coil closest
 %      to the slot opening
 %
-%    thetacy - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacy - coil inner slot pitch in radians at the end of the coil closest
 %      to the yoke
 %
 %    thetasg - angular pitch of the coil slot opening between shoes
@@ -121,16 +121,16 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 %
 %    thetam -  angular pitch of magnet in radians
 %
-%    thetacg - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacg - coil inner slot pitch in radians at the end of the coil closest
 %      to the slot opening
 %
-%    thetacy - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacy - coil inner slot pitch in radians at the end of the coil closest
 %      to the yoke
 %
 %    thetasg - angular pitch of the coil slot opening between shoes
 %
 %    ls - stack length (depth 'into the page' of simulation)
-% 
+%
 % or all the fields:
 %
 %    Ryo - radial distance to armature yoke outer surface
@@ -167,10 +167,10 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 %
 %    thetam - angular pitch of magnet in radians
 %
-%    thetacg - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacg - coil inner slot pitch in radians at the end of the coil closest
 %      to the slot opening
 %
-%    thetacy - coil inner slot pitch in radians at the end of the coil closest 
+%    thetacy - coil inner slot pitch in radians at the end of the coil closest
 %      to the yoke
 %
 %    thetasg - angular pitch of the coil slot opening between shoes
@@ -186,14 +186,14 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 %  yp - Average coil pitch as defined by (Qs/Poles)
 %  yd - Actual coil pitch as defined by round(yp) +/- k
 %  Qs  -  total number of stator slots in machine
-%  Qc  -  total number of winding coils in machine 
+%  Qc  -  total number of winding coils in machine
 %  q  -  number of slots per pole and phase
 %  qn  -  numerator of q
 %  qd  -  denominator of q
 %  qc - number of coils per pole and phase
 %  qcn  -  numerator of qc
 %  qcd  -  denominator of qc
-%  Qcb - basic winding (the minimum number of coils required to make up a 
+%  Qcb - basic winding (the minimum number of coils required to make up a
 %    repetitive segment of the machine that can be modelled using symmetry)
 %  pb - the number of poles corresponding to the basic winding in Qcb
 %
@@ -231,9 +231,9 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
 %
 % Example:
 %
-% 
 %
-% See also: fr.m, completedesign_RADIAL.m, completedesign_ROTARY.m, 
+%
+% See also: fr.m, completedesign_RADIAL.m, completedesign_ROTARY.m,
 %           completedesign_AM.m
 %
 % [1] J. J. Germishuizen and M. J. Kamper, "Classification of symmetrical
@@ -244,7 +244,7 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
     if nargin < 2
         simoptions = struct ();
     end
-    
+
     if nargin < 3
         setchoice = 'firstcomplete';
     end
@@ -252,17 +252,17 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
     % perform processing common to all radial machines, primarily the
     % winding specification
     design = completedesign_RADIAL(design, simoptions);
-    
+
     % calculate the various dimensions from the supplied ratios depending
     % on the specified stator type
     if strncmpi(design.ArmatureType, 'external', 1)
-        
+
         design = completeexternalarmature (design, setchoice);
-        
+
     elseif strncmpi(design.ArmatureType, 'internal', 1)
-        
+
         design = completeinternalarmature (design, setchoice);
-        
+
     else
         error('Unrecognised armature type.')
     end
@@ -274,19 +274,26 @@ function design = completedesign_RADIAL_SLOTTED(design, simoptions, setchoice)
         design.thetacgVthetas = design.thetacg / design.thetas;
         design.thetacyVthetas = design.thetacy / design.thetas;
     end
-        
+
     % mean radial position of magnets and coils
     design.Rmm = mean([design.Rmo, design.Rmi]);
     design.Rcm = mean([design.Rci, design.Rco]);
     design.Rbm = mean([design.Rbo, design.Rbi]);
     design.Rym = mean([design.Ryi, design.Ryo]);
     design.thetac = [design.thetacg, design.thetacy];
-    
+
+    % get the mean air gap position
+    if strcmp(design.ArmatureType, 'external')
+        design.Rgm = design.Rmo + design.g/2;
+    elseif strcmp(design.ArmatureType, 'internal')
+        design.Rgm = design.Rmi - design.g/2;
+    end
+
     [design.NCoilsPerPhase,~] = rat(fr(design.Qc,design.Phases));
-    
+
     % slot pitch at the mean slot height
     design.tausm = design.thetas * design.Rcm;
-    
+
 end
 
 function design = completeexternalarmature (design, setchoice)
@@ -294,42 +301,42 @@ function design = completeexternalarmature (design, setchoice)
     if nargin < 2
         setchoice = 'firstcomplete';
     end
-            
+
     switch lower (setchoice)
-        
+
         case 'ratios'
-            
-            forceratios = true; 
+
+            forceratios = true;
             forcerdims = false;
             forcetdims = false;
-            
+
         case 'radims'
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = true;
             forcetdims = false;
-            
+
         case 'tdims'
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = false;
             forcetdims = true;
-            
+
         case 'firstcomplete'
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = false;
             forcetdims = false;
-            
+
         otherwise
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = false;
             forcetdims = false;
-            
+
     end
 
-                
+
     ratiofields = { 'RyiVRyo', 0, 1.0;
                     'RtsbVRyi', 0, 1.0;
                     'RaiVRtsb', 0, 1.0;
@@ -342,19 +349,19 @@ function design = completeexternalarmature (design, setchoice)
                     'thetacyVthetas', 0, 1.0;
                     'thetasgVthetacg', 0, 1.0;
                     'lsVtm', 0, inf; };
-                    
+
     rdimsfields = { 'Ryo';
                     'Ryi';
                     'Rtsb';
                     'Rai';
                     'Rmi';
-                    'Rmo'; 
+                    'Rmo';
                     'Rbi';
                     'tsg';
                     'thetam';
                     'thetacg';
                     'thetacy';
-                    'thetasg'; 
+                    'thetasg';
                     'ls'; };
 
     tdimsfields = { 'Ryo';
@@ -368,7 +375,7 @@ function design = completeexternalarmature (design, setchoice)
                     'thetam';
                     'thetacg';
                     'thetacy';
-                    'thetasg'; 
+                    'thetasg';
                     'ls'; };
 
     if forceratios || (all(isfield(design, ratiofields(:,1))) && ~(forcerdims || forcetdims))
@@ -381,7 +388,7 @@ function design = completeexternalarmature (design, setchoice)
         design.thetacg = design.thetacgVthetas * design.thetas;
         design.thetacy = design.thetacyVthetas * design.thetas;
         design.thetasg = design.thetasgVthetacg * design.thetacg;
-        
+
         % the shoe tip length
         design.tsb = design.Rtsb - design.Rai;
         design.tsg = design.tsgVtsb * design.tsb;
@@ -394,11 +401,11 @@ function design = completeexternalarmature (design, setchoice)
         % calculate the lengths
         design.ty = design.Ryo - design.Ryi;
         design.tc = design.Rco - design.Rci;
-        
+
         if isfield (design, 'Rcb')
             design.tc(2) = design.Rco - design.Rcb;
         end
-        
+
         design.tsb = design.Rtsb - design.Rai;
         design.g = design.Rai - design.Rmo;
         design.tm = design.Rmo - design.Rmi;
@@ -420,14 +427,14 @@ function design = completeexternalarmature (design, setchoice)
         design.Rci = design.Rtsb;
         design.Rbo = design.Rmi;
         design.Rtsg = design.Rai + design.tsg;
-        
+
         design.tc = design.Rco - design.Rci;
-        
+
         if isfield (design, 'Rcb')
             design.tc(2) = design.Rco - design.Rcb;
             design.RcbVRyi = design.Rcb / design.Ryi;
         end
-        
+
         % complete the ratios
         design.RyiVRyo = design.Ryi / design.Ryo;
         design.RtsbVRyi = design.Rtsb / design.Ryi;
@@ -436,7 +443,7 @@ function design = completeexternalarmature (design, setchoice)
         design.RmiVRmo = design.Rmi / design.Rmo;
         design.RbiVRmi = design.Rbi / design.Rmi;
         design.tsgVtsb = design.tsg / design.tsb;
-        
+
         % thetap and thetas are calculated in completedesign_RADIAL
         design.thetamVthetap = design.thetam / design.thetap;
         design.thetacgVthetas = design.thetacg / design.thetas;
@@ -445,7 +452,7 @@ function design = completeexternalarmature (design, setchoice)
         design.lsVtm = design.ls / design.tm;
 
     elseif forcetdims || (all(isfield(design, tdimsfields)) && ~(forceratios || forcerdims))
-        
+
         % The dimensions are present already, specified using lengths,
         % calculate the radial dimensions
         design.Ryi = design.Ryo - design.ty;
@@ -454,18 +461,18 @@ function design = completeexternalarmature (design, setchoice)
         design.Rmo = design.Rai - design.g;
         design.Rmi = design.Rmo - design.tm;
         design.Rbi = design.Rmi - design.tbi;
-        
+
         design.Rco = design.Ryi;
         design.Rci = design.Rtsb;
-        
+
         if numel (design.tc) > 1
             design.Rcb = design.Rco - design.tc(2);
             design.RcbVRyi = design.Rcb / design.Ryi;
         end
-        
+
         design.Rbo = design.Rmi;
         design.Rtsg = design.Rai + design.tsg;
-        
+
         % complete the ratios
         design.RyiVRyo = design.Ryi / design.Ryo;
         design.RtsbVRyi = design.Rtsb / design.Ryi;
@@ -474,7 +481,7 @@ function design = completeexternalarmature (design, setchoice)
         design.RmiVRmo = design.Rmi / design.Rmo;
         design.RbiVRmi = design.Rbi / design.Rmi;
         design.tsgVtsb = design.tsg / design.tsb;
-        
+
         % thetap and thetas are calculated in completedesign_RADIAL
         design.thetamVthetap = design.thetam / design.thetap;
         design.thetacgVthetas = design.thetacg / design.thetas;
@@ -490,7 +497,7 @@ function design = completeexternalarmature (design, setchoice)
                sprintf('%s, ', rdimsfields{:,1}), ...
                sprintf('%s, ', tdimsfields{:,1}))
     end
-    
+
  %   checkdesignratios_AM (design, ratiofields, true);
 
 end
@@ -501,39 +508,39 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
     if nargin < 2
         setchoice = 'firstcomplete';
     end
-            
+
     switch lower (setchoice)
-        
+
         case 'ratios'
-            
-            forceratios = true; 
+
+            forceratios = true;
             forcerdims = false;
             forcetdims = false;
-            
+
         case 'radims'
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = true;
             forcetdims = false;
-            
+
         case 'tdims'
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = false;
             forcetdims = true;
-            
+
         case 'firstcomplete'
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = false;
             forcetdims = false;
-            
+
         otherwise
-            
-            forceratios = false; 
+
+            forceratios = false;
             forcerdims = false;
             forcetdims = false;
-            
+
     end
 
     ratiofields = { 'RmoVRbo', 0, 1.0;
@@ -548,19 +555,19 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
                     'thetacyVthetas', 0, 1.0;
                     'thetasgVthetacg', 0, 1.0;
                     'lsVtm', 0, inf };
-                    
+
     rdimsfields = { 'Rbo';
                     'Rmo';
                     'Rmi';
                     'Rao';
                     'Rtsb';
-                    'Ryo'; 
+                    'Ryo';
                     'Ryi';
                     'tsg';
                     'thetam';
                     'thetacg';
                     'thetacy';
-                    'thetasg'; 
+                    'thetasg';
                     'ls'; };
 
     tdimsfields = { 'Rbo';
@@ -574,7 +581,7 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
                     'thetam';
                     'thetacg';
                     'thetacy';
-                    'thetasg'; 
+                    'thetasg';
                     'ls'; };
 
     if forceratios || (all(isfield(design, ratiofields(:,1))) && ~(forcerdims || forcetdims))
@@ -587,7 +594,7 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
         design.thetacg = design.thetacgVthetas * design.thetas;
         design.thetacy = design.thetacyVthetas * design.thetas;
         design.thetasg = design.thetasgVthetacg * design.thetacg;
-        
+
         % the shoe tip length
         design.tsb = design.Rao - design.Rtsb;
         design.tsg = design.tsgVtsb * design.tsb;
@@ -600,11 +607,11 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
         % calculate the lengths
         design.ty = design.Ryo - design.Ryi;
         design.tc = design.Rco - design.Rci;
-        
+
         if isfield (design, 'Rcb')
             design.tc(2) = design.Rcb - design.Ryo;
         end
-        
+
         design.tsb = design.Rao - design.Rtsb;
         design.g = design.Rmi - design.Rao;
         design.tm = design.Rmo - design.Rmi;
@@ -627,12 +634,12 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
         design.Rci = design.Ryo;
         design.Rbi = design.Rmo;
         design.Rtsg = design.Rao - design.tsg;
-        
+
         if isfield (design, 'Rcb')
             design.tc(2) = design.Rcb - design.Ryo;
             design.RcbVRtsb = design.Rcb / design.Rtsb;
         end
-        
+
         design.RmoVRbo = design.Rmo / design.Rbo;
         design.RmiVRmo = design.Rmi / design.Rmo;
         design.RaoVRmi = design.Rao / design.Rmi;
@@ -640,7 +647,7 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
         design.RyoVRtsb = design.Ryo / design.Rtsb;
         design.RyiVRyo = design.Ryi / design.Ryo;
         design.tsgVtsb = design.tsg / design.tsb;
-        
+
         design.thetamVthetap = design.thetam / design.thetap;
         design.thetacgVthetas = design.thetacg / design.thetas;
         design.thetacyVthetas = design.thetacy / design.thetas;
@@ -654,19 +661,19 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
         design.Rmi = design.Rmo - design.tm;
         design.Rao = design.Rmi - design.g;
         design.Rtsb = design.Rao - design.tsb;
-        design.Ryo = design.Rtsb - design.tc(1); 
+        design.Ryo = design.Rtsb - design.tc(1);
         design.Ryi = design.Ryo - design.ty;
 
         design.Rco = design.Rtsb;
         design.Rci = design.Ryo;
         design.Rbi = design.Rmo;
         design.Rtsg = design.Rao - design.tsg;
-        
+
         if numel (design.tc) > 1
             design.Rcb = design.Ryo + design.tc(2);
             design.RcbVRtsb = design.Rcb / design.Ryo;
         end
-        
+
         design.RmoVRbo = design.Rmo / design.Rbo;
         design.RmiVRmo = design.Rmi / design.Rmo;
         design.RaoVRmi = design.Rao / design.Rmi;
@@ -674,7 +681,7 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
         design.RyoVRtsb = design.Ryo / design.Rtsb;
         design.RyiVRyo = design.Ryi / design.Ryo;
         design.tsgVtsb = design.tsg / design.tsb;
-        
+
         design.thetamVthetap = design.thetam / design.thetap;
         design.thetacgVthetas = design.thetacg / design.thetas;
         design.thetacyVthetas = design.thetacy / design.thetas;
@@ -689,7 +696,7 @@ function [design, ratiofields] = completeinternalarmature (design, setchoice)
                sprintf('%s, ', rdimsfields{:,1}), ...
                sprintf('%s, ', tdimsfields{:,1}));
     end
-    
+
 %    checkdesignratios_AM (design, ratiofields, true);
 
 end

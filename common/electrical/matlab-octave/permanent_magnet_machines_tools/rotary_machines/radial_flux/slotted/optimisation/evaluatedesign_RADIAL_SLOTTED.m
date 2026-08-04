@@ -19,8 +19,8 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
 %
 %  simoptions - structure used to control how the system is evaluated. It
 %  can contain the following fields:
-%   
-%   Evaluation - 
+%
+%   Evaluation -
 %
 %   ForceFullSim : true/false flag indicating whether to perform design
 %    screening or not. If true, no screening function is run on the
@@ -66,7 +66,7 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
 %     The supplied function must have the calling syntax
 %
 %     [design, simoptions] = thefunction(design, simoptions, finfunarg1, finfunarg2, ...)
-%   
+%
 %     Where finfunarg1, finfunarg2, ... if supplied are the elements of the
 %     a cell array, passed in using the Parameter-value pair
 %     ExtraPostPreProcFcnArgs, e.g.
@@ -162,7 +162,7 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
 %     integration and must have the following syntax:
 %
 %     results = spfcn (flag, results, sol, design, simoptions)
-%   
+%
 %     For further information on creating a split point function, see the
 %     help for 'odesplit.m'.
 %
@@ -204,7 +204,7 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
 %
 %  Y - output solution vector as produced by ode solver functions, e.g.
 %   ode45
-% 
+%
 %  results - the results as produced by the supplied function in
 %   ODESim.PostSimFcn. Typically a structure containig fields which are the
 %   outputs of various quantities at each time step in the simulation.
@@ -216,18 +216,12 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
 
     simoptions.Evaluation = designandevaloptions_RADIAL_SLOTTED(simoptions.Evaluation);
 
-    if strcmp(design.ArmatureType, 'external')
-        design.Rgm = design.Rmo + design.g/2;
-    elseif strcmp(design.ArmatureType, 'internal')
-        design.Rgm = design.Rmi - design.g/2;
-    end
-    
     % pre-screen the design to see if a full simulation is worth it
     [sdesign, ssimoptions] = screendesign_RADIAL_SLOTTED(design, simoptions);
-    
+
     simoptions = setfieldifabsent(simoptions, 'ForceFullSim', false);
     simoptions = setfieldifabsent(simoptions, 'DoStructEval', false);
-    
+
     check.isLogicalScalar (simoptions.ForceFullSim, true, 'ForceFullSim');
     check.isLogicalScalar (simoptions.DoStructEval, true, 'DoStructEval');
 
@@ -244,7 +238,7 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
     elseif isfield (ssimoptions, 'min_VoltageGenTerminalPhaseRms')
         min_Voltage_check_value = ssimoptions.min_VoltageGenTerminalPhaseRms;
     end
-    
+
     if ~simoptions.ForceFullSim && ...
          ( ...
             (sdesign.EMFPhaseRms > 2*max_Voltage_check_value) ...
@@ -252,39 +246,39 @@ function [score, design, simoptions, T, Y, results] = evaluatedesign_RADIAL_SLOT
             || (sdesign.PowerLoadMean > 2*ssimoptions.max_PowerLoadMean) ...
             || (sdesign.PowerLoadMean < 0.5*ssimoptions.min_PowerLoadMean) ...
          )
-        
+
         T = [];
         Y = [];
         results = [];
-        
+
         % estimate the masses of the components
         sdesign = materialmasses_RADIAL_SLOTTED(sdesign, ssimoptions);
-        
+
         % generate a score for the machine
         [prescore, sdesign, ssimoptions] = machinescore_RADIAL_SLOTTED(sdesign, ssimoptions);
-        
+
         % make the score bigger to encourage getting into the full test zone
-        score = prescore * 3; 
+        score = prescore * 3;
         design = sdesign;
         simoptions = ssimoptions;
-        
+
     else
         % run the simulations and return the results using the generic
         % radial flux evaluation function
         [design, simoptions, T, Y, results] = evaluatedesign_RADIAL(design, simoptions);
-        
+
         if simoptions.DoStructEval
             % evaluate the design structurally
             [design, simoptions] = feval(simoptions.Evaluation.structevalfcn, design, simoptions);
         end
-        
+
         % estimate the masses of the components
         design = materialmasses_RADIAL_SLOTTED(design, simoptions);
-        
+
         % generate a score for the machine
         [score, design, simoptions] = machinescore_RADIAL_SLOTTED(design, simoptions);
     end
-    
+
 end
 
 
@@ -293,16 +287,16 @@ function [sdesign, ssimoptions] = screendesign_RADIAL_SLOTTED(design, simoptions
 
     sdesign = design;
     ssimoptions = simoptions;
-    
+
     if ~isfield(sdesign, 'CoreLoss')
         % CoreLoss will be the armature back iron data
         [sdesign.CoreLoss.fq, ...
          sdesign.CoreLoss.Bq, ...
          sdesign.CoreLoss.Pq ] = m36assheared26gagecorelossdata(false);
-     
+
         sdesign.CoreLoss(2) = sdesign.CoreLoss(1);
     end
-    
+
     % do some common design processing things, but skipping calculations of
     % coil properties
     ssimoptions.SkipCheckCoilProps = true;
@@ -346,9 +340,9 @@ function [sdesign, ssimoptions] = screendesign_RADIAL_SLOTTED(design, simoptions
     % pole pair, simulate another basic winding unit
     if ( ( (simpolepairs*2/sdesign.pb) * sdesign.Qsb ) < 6 ) ...
             && (simpolepairs*2 <= sdesign.Poles)
-        
+
         simpolepairs = simpolepairs * 2;
-        
+
     end
 
     [sdesign.FemmProblem, sdesign.RotorDrawingInfo, sdesign.StatorDrawingInfo] = ...
@@ -456,10 +450,10 @@ function [sdesign, ssimoptions] = screendesign_RADIAL_SLOTTED(design, simoptions
     sdesign.FluxDensityMagnitudeAirGapPeak = max (Bmag);
 
     % tidy up the fea files
-    delete (femfilename); delete (ansfilename); 
-    
+    delete (femfilename); delete (ansfilename);
+
     sdesign = checkcoilprops_AM(sdesign);
-    
+
     if rmcoilturns
        peakfl = peakfl * sdesign.CoilTurns;
     end
@@ -467,59 +461,59 @@ function [sdesign, ssimoptions] = screendesign_RADIAL_SLOTTED(design, simoptions
     omega = rpm2omega(ssimoptions.RPM);
 
     sdesign.EMFCoilPeak = peakemfest_ROTARY(abs(peakfl), omega, sdesign.Poles / 2);
-    
+
     sdesign.EMFCoilRms = sdesign.EMFCoilPeak / sqrt(2);
 
     sdesign.EMFPhasePeak = sdesign.CoilsPerBranch * sdesign.EMFCoilPeak;
-    
+
     sdesign.EMFPhaseRms = sdesign.EMFPhasePeak  / sqrt(2);
 
 %     if sdesign.EMFPhaseRms < ssimoptions.min_EMFPhaseRms
-% 
+%
 %         min_coil_turns_factor = ssimoptions.min_EMFPhaseRms / sdesign.EMFPhaseRms;
-% 
+%
 %         sdesign = rmfield (sdesign, 'Dc');
-% 
+%
 %         sdesign.CoilTurns = max (10000, round (min_coil_turns_factor * ssdesign.CoilTurns));
-% 
+%
 %         sdesign = checkcoilprops_AM(sdesign);
-% 
+%
 %     elseif sdesign.EMFPhaseRms > ssimoptions.max_EMFPhaseRms
-% 
+%
 %         min_coil_turns_factor = ssimoptions.max_EMFPhaseRms / sdesign.EMFPhaseRms;
-% 
+%
 %         sdesign = rmfield (sdesign, 'Dc');
-% 
+%
 %         sdesign.CoilTurns = min(1, round (min_coil_turns_factor * ssdesign.CoilTurns));
-% 
+%
 %         sdesign = checkcoilprops_AM(sdesign);
-% 
+%
 %     end
-    
+
     % now calculate coil resistance using the same function as would be
     % used in simfun_RADIAL_SLOTTED
     sdesign = coilresistance_RADIAL_SLOTTED (sdesign);
-    
+
     sdesign.CoilInductance = 0;
-    
+
     sdesign.psilookup = [0,1;0,0];
-    
+
     [sdesign, ssimoptions] = finfun_RADIAL(sdesign, ssimoptions);
 
     sdesign.IPhasePeak = sdesign.EMFPhasePeak / (sdesign.PhaseResistance(1) + sdesign.LoadResistance(1));
     sdesign.ICoilPeak = sdesign.IPhasePeak / sdesign.Branches;
-    
+
     sdesign.IPhaseRms = sdesign.IPhasePeak / sqrt(2);
     sdesign.ICoilRms = sdesign.IPhaseRms / sdesign.Branches;
 
     sdesign.VoltageGenTerminalPhaseRms = sdesign.EMFPhaseRms - (sdesign.IPhaseRms.*sdesign.PhaseResistance(1));
-    
+
     sdesign.PowerLoadMean = sdesign.IPhaseRms.^2 * sdesign.LoadResistance * sdesign.Phases;
-    
+
     sdesign.JCoilRms = sdesign.ICoilRms / sdesign.ConductorArea;
-    
+
     sdesign.JCoilPeak = sdesign.ICoilPeak / sdesign.ConductorArea;
-    
+
     sdesign.Efficiency = 0.9 * (sdesign.LoadResistance / (sdesign.CoilResistance + sdesign.LoadResistance));
     sdesign.TorqueRippleFactor = 0.2;
     sdesign.VoltagePercentTHD = 50;
@@ -527,7 +521,7 @@ function [sdesign, ssimoptions] = screendesign_RADIAL_SLOTTED(design, simoptions
         sdesign.TemperaturePeak = ssimoptions.max_TemperaturePeak - 1;
     end
     sdesign.CoggingTorquePeak = 0;
-    
+
 end
 
 function [sdesign, ssimoptions] = badscore (sdesign, ssimoptions)
@@ -543,14 +537,14 @@ function [sdesign, ssimoptions] = badscore (sdesign, ssimoptions)
     sdesign.CoggingTorquePeak = 2 * ssimoptions.max_CoggingTorquePeak;
     sdesign.Efficiency = 0.5;
     sdesign.ArmatureToothFluxDensityPeak = 2 * ssimoptions.max_ArmatureToothFluxDensityPeak;
-    
+
     % now calculate coil resistance
     sdesign.MTL = rectcoilmtl( sdesign.ls, ...
                                sdesign.yd * sdesign.thetas * sdesign.Rcm, ...
                                mean([sdesign.thetacg, sdesign.thetacy] * sdesign.Rcm) );
-                           
+
     sdesign.CoilTurns = 1;
     sdesign.ArmatureIronAreaPerPole = 1;
     ssimoptions = setfieldifabsent(ssimoptions, 'basescorefcn', 'costscore_AM');
-    
+
 end
