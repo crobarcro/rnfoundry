@@ -43,3 +43,8 @@ def setup(app):
     app.add_node(youtube.youtube,
                  html=(youtube.visit, youtube.depart))
     app.add_directive('youtube', youtube.YoutubeDirective)
+    return {
+        'version': __version__,
+        'parallel_read_safe': True,
+        'parallel_write_safe': True,
+    }

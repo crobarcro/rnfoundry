@@ -27,9 +27,6 @@ def is_url(s):
 
 
 def get_video_id(url):
-
-    print ('embedding youtube video from: ' + url)
-
     return urlparse.parse_qs(urlparse.urlparse(url).query)['v'][0]
 
 
@@ -40,11 +37,7 @@ def visit(self, node):
     video_id = node.video_id
     url = u'https://www.youtube.com/embed/{0}'.format(video_id)
 
-    print ('Embedding using url: ' + url)
-
     tag = u'''<div class="youtube-iframe"><iframe width="640" height="360" src="{0}" frameborder="0" allowfullscreen="1">&nbsp;</iframe></div>'''.format(url)
-
-    print ('tag is: ' + tag)
 
     self.body.append(tag)
 

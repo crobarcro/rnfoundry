@@ -41,17 +41,25 @@ This produces the plots in :numref:`example_b_cosim_1`,
 :numref:`example_b_cosim_2` and :numref:`example_b_cosim_3`.
 
 .. _example_b_cosim_1:
+
 .. figure:: /images/example_basic_cosimulation_1.png
 	:align: center
 
+	Basic cosimulation result plot.
 
 .. _example_b_cosim_2:
+
 .. figure:: /images/example_basic_cosimulation_2.png
 	:align: center
+
+	Basic cosimulation result plot.
 	
 .. _example_b_cosim_3:
+
 .. figure:: /images/example_basic_cosimulation_3.png
 	:align: center
+
+	Basic cosimulation result plot.
 	
 We can take a closer look at the various parts of this example in 
 order to fully understand it.
@@ -165,5 +173,3 @@ It can then be used to apply forces to both nodes, also parallel to
 this axis and then transform these forces to forces in the global 
 frame suitable for application using the MBDyn external structural 
 force element (which expects forces in the global frame). 
-
-

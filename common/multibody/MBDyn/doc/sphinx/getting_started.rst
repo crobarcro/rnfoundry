@@ -23,8 +23,11 @@ collection of input data, conceptually this is shown in
 :numref:`mbdyn_basic_object_diagram`.
 
 .. _mbdyn_basic_object_diagram:
+
 .. figure:: /images/mbdyn_basic_object_diagram.png
 	:align: center
+
+	MBDyn Matlab Toolbox object model.
 
 Problems
 ========
@@ -128,8 +131,11 @@ Matlab and MBDyn. An example of this can be found later in this
 documentation.
 
 .. _double_pend_diag:
+
 .. figure:: http://www.sky-engin.jp/en/MBDynExamples/ex03/plan_double_rigid_pendulum.png
     :alt: my-picture1
+
+    Double pendulum example geometry.
 
 The pendulum consists of two bodies. One body is attached by a pin to 
 a fixed location. The other body is attached to the first by a 
@@ -148,33 +154,51 @@ fgures, :numref:`example_d_pen_2`, :numref:`example_d_pen_3`,
 produced using the ``mbdyn.postproc`` class.
 
 .. _example_d_pen_1:
+
 .. figure:: /images/example_double_pendulum_1.png
 	:align: center
 
+	Double pendulum initial setup.
+
 
 .. _example_d_pen_2:
+
 .. figure:: /images/example_double_pendulum_2.png
 	:align: center
+
+	Double pendulum result plot.
 	
 	
 .. _example_d_pen_3:
+
 .. figure:: /images/example_double_pendulum_3.png
 	:align: center
+
+	Double pendulum result plot.
 	
 	
 .. _example_d_pen_4:
+
 .. figure:: /images/example_double_pendulum_4.png
 	:align: center
+
+	Double pendulum result plot.
 	
 	
 .. _example_d_pen_5:
+
 .. figure:: /images/example_double_pendulum_5.png
 	:align: center
 
+	Double pendulum result plot.
+
 
 .. _example_d_pen_6:
+
 .. figure:: /images/example_double_pendulum_6.png
 	:align: center
+
+	Double pendulum result plot.
 
 The final command in the example, i.e. 
 
@@ -198,8 +222,5 @@ the matlab built-in ``help`` and ``doc`` commands. e.g.::
 An API reference containing the same information (actually generated 
 from the help for the classes) is provided with this docuement.
  
-
-
-
 
 
