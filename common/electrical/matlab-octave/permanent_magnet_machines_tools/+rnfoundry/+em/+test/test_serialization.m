@@ -26,6 +26,19 @@ rnfoundry.em.test.assertNear(rnfoundry.em.rotary.radial.SlottedPMMachine.fromStr
 % Explicit CoilArea is exact; omission is rejected.
 missing=legacy; missing=rmfield(missing,'CoilArea');
 rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromLegacyStruct(missing),'rnfoundry:em:MissingPackArea');
+% Every persistence layer rejects future versions and unknown concrete types.
+bad=s; bad.SchemaVersion=2;
+rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedSchema');
+bad=s; bad.Armature.Winding.SchemaVersion=2;
+rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedSchema');
+bad=s; bad.Armature.Winding.Conductor.SchemaVersion=2;
+rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedSchema');
+bad=s; bad.Armature.Winding.CoilGeometry.SchemaVersion=2;
+rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedSchema');
+bad=s; bad.Field.Type='FutureField';
+rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedType');
+bad=s; bad.Armature.Type='FutureArmature';
+rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedType');
 % Nested type dispatch rejects unknown types.
 bad=s; bad.Armature.Winding.Conductor.Type='FutureConductor';
 rnfoundry.em.test.assertError(@() rnfoundry.em.rotary.radial.SlottedPMMachine.fromStruct(bad),'rnfoundry:em:UnsupportedType');

@@ -1,4 +1,8 @@
 classdef RoundWireConductor
+    %ROUNDWIRECONDUCTOR Ordinary single- or multi-strand round conductor.
+    %   StrandCount and StrandDiameter [m] describe physical parallel wires;
+    %   EquivalentCopperDiameter is the equal-copper-area legacy Dc query.
+    %   Milestone 1A supports only LegacyEnamelCorrelation insulation.
     properties (SetAccess = private)
         Material
         StrandCount
@@ -47,6 +51,11 @@ classdef RoundWireConductor
             if ~(isscalar(obj.StrandDiameter) && isfinite(obj.StrandDiameter) && obj.StrandDiameter > 0)
                 error('rnfoundry:em:InvalidStrandDiameter', 'StrandDiameter must be positive.');
             end
+            if ~isstruct(obj.Insulation) || ~isfield(obj.Insulation, 'Type') ...
+                    || ~strcmp(obj.Insulation.Type, 'LegacyEnamelCorrelation')
+                error('rnfoundry:em:UnsupportedInsulation', ...
+                      'Milestone 1A supports only LegacyEnamelCorrelation insulation.');
+            end
         end
         function resistance = dcResistancePerLength(obj, resistivity)
             if nargin < 2
@@ -71,9 +80,8 @@ classdef RoundWireConductor
     end
     methods (Static)
         function obj = fromStruct(s)
-            if ~isfield(s, 'Type') || ~strcmp(s.Type, 'RoundWireConductor')
-                error('rnfoundry:em:UnsupportedType', 'Unsupported conductor type.');
-            end
+            rnfoundry.em.validateStructEnvelope( ...
+                s, 'rnfoundry.em.winding.Conductor', 'RoundWireConductor');
             obj = rnfoundry.em.winding.RoundWireConductor( ...
                 s.Material, s.StrandCount, s.StrandDiameter, s.Insulation);
         end

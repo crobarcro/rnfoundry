@@ -1,5 +1,10 @@
 function resolved = resolvePacking(spec, coilGeometry)
 %RESOLVEPACKING Resolve legacy-compatible ordinary round-wire packing.
+%   RESOLVED = resolvePacking(SPEC, COILGEOMETRY) accepts any supported pair
+%   of equivalent diameter, turns and PackingFactor, plus strand count.
+%   PackingFactor is legacy CoilFillFactor (insulated occupied-wire area),
+%   while RESOLVED.CopperFillFactor reports actual copper area / PackArea.
+%   Packing remains a winding/geometry relationship, not conductor state.
 coilGeometry.validate();
 area = coilGeometry.PackArea;
 strandCount = getAlias(spec, {'StrandCount', 'NStrands'}, 1);

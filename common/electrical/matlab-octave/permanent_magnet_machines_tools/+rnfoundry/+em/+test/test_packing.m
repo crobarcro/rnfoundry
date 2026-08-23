@@ -19,6 +19,15 @@ for strands=[1,4]
         rnfoundry.em.test.assertNear(modern.CopperFillFactor,modern.TurnsPerCoil*c.CopperAreaPerTurn/geometry.PackArea);
     end
 end
+defaultConductor=rnfoundry.em.winding.RoundWireConductor(struct(),1,1e-3);
+assert(strcmp(defaultConductor.Insulation.Type,'LegacyEnamelCorrelation'));
+explicit=rnfoundry.em.winding.RoundWireConductor( ...
+    struct(),1,1e-3,struct('Type','LegacyEnamelCorrelation'));
+roundTrip=rnfoundry.em.winding.RoundWireConductor.fromStruct(explicit.toStruct());
+assert(isequal(roundTrip.Insulation,explicit.Insulation));
+rnfoundry.em.test.assertError(@() rnfoundry.em.winding.RoundWireConductor( ...
+    struct(),1,1e-3,struct('Type','Unsupported')), ...
+    'rnfoundry:em:UnsupportedInsulation');
 for diameter=[.4,1,1.59,1.60,2]*1e-3
     rnfoundry.em.test.assertNear(rnfoundry.em.winding.insulatedWireDiameter(diameter),conductord2wired(diameter));
 end

@@ -1,4 +1,8 @@
 classdef CoilGeometry
+    %COILGEOMETRY Resolved installed-coil geometry value object.
+    %   PackArea [m^2], MeanTurnLength [m], and active segment lengths [m]
+    %   remain distinct. PackArea must be resolved explicitly; Milestone 1A
+    %   does not approximate the radial slot-region area.
     properties (SetAccess = private)
         PackArea
         MeanTurnLength

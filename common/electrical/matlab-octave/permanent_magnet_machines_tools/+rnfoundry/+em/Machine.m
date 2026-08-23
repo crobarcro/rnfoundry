@@ -1,4 +1,9 @@
 classdef Machine
+    %MACHINE Base value class for canonical electromagnetic machines.
+    %   PoleSpan is the physical extent of one magnetic pole along the
+    %   motion coordinate (metres for linear machines, radians for rotary
+    %   machines). Stored state has private setters. Use versioned structs
+    %   returned by toStruct for persistence rather than saved class objects.
     %MACHINE Base value type for canonical electromagnetic machines.
     properties (SetAccess = private)
         PoleSpan

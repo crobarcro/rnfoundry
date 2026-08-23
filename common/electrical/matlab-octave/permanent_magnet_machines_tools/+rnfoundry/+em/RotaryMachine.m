@@ -1,4 +1,7 @@
 classdef RotaryMachine < rnfoundry.em.Machine
+    %ROTARYMACHINE Base value class for rotary electromagnetic machines.
+    %   PoleSpan and the dependent engineering alias thetap are mechanical
+    %   radians per magnetic pole. electricalFrequency accepts rad/s.
     properties (Dependent)
         thetap
     end

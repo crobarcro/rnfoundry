@@ -1,4 +1,14 @@
 classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
+    %SLOTTEDPMMACHINE Canonical radial-flux slotted PM machine.
+    %   The value object composes Field, Armature and stack length ls [m].
+    %   g, Rgm, tausm and ratios are derived. Factories accept legacy ratio,
+    %   radius, thickness, or completed-struct forms. Public construction is
+    %   fromRatios, fromRadii, fromThicknesses, or fromLegacyStruct.
+    %   CoilArea/PackArea must be explicit; no slot-area approximation is used.
+    %   A resolved WindingLayout may be supplied; otherwise windinglayout and
+    %   mexmPhaseWL are used, and construction fails clearly if unavailable.
+    %   Scalar legacy tc resolves tcb=0.05*tc, matching legacy FEA geometry.
+    %   Use toStruct/fromStruct for versioned persistence, not class-instance saves.
     properties (SetAccess = private)
         Field
         Armature
@@ -159,7 +169,12 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
                 'Conductor',packing.Conductor,'CoilGeometry',geometry);
             winding = rnfoundry.em.winding.Winding(ws);
             tc = d.tc(1);
-            if numel(d.tc)>1, tcb=d.tc(2); else, tcb=0.05*tc; end
+            % Legacy drawing uses CoilBaseFraction=0.05 when tc is scalar.
+            if numel(d.tc) > 1
+                tcb = d.tc(2);
+            else
+                tcb = 0.05 .* tc;
+            end
             if strncmpi(d.ArmatureType,'external',1)
                 position='external'; ra=d.Rai;
             else
@@ -179,15 +194,10 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
             obj = rnfoundry.em.rotary.radial.SlottedPMMachine(field,armature,d.ls,d.NStages);
         end
         function obj = fromStruct(s)
-            if ~isfield(s,'Schema') || ~strcmp(s.Schema,'rnfoundry.em.SlottedPMMachine') ...
-                    || ~isfield(s,'SchemaVersion') || s.SchemaVersion~=1 ...
-                    || ~isfield(s,'Type') || ~strcmp(s.Type,'SlottedPMMachine')
-                error('rnfoundry:em:UnsupportedSchema','Unsupported machine schema.');
-            end
-            field = rnfoundry.em.rotary.radial.RadialPMField(s.Field);
-            armatureStruct = s.Armature;
-            armatureStruct.Winding = rnfoundry.em.winding.Winding.fromStruct(s.Armature.Winding);
-            armature = rnfoundry.em.rotary.radial.SlottedArmature(armatureStruct);
+            rnfoundry.em.validateStructEnvelope( ...
+                s, 'rnfoundry.em.SlottedPMMachine', 'SlottedPMMachine');
+            field = rnfoundry.em.rotary.radial.RadialPMField.fromStruct(s.Field);
+            armature = rnfoundry.em.rotary.radial.SlottedArmature.fromStruct(s.Armature);
             obj = rnfoundry.em.rotary.radial.SlottedPMMachine(field,armature,s.ls,s.NStages);
             if ~isfield(s,'PoleSpan') || abs(s.PoleSpan-obj.PoleSpan)>20*eps
                 error('rnfoundry:em:InvalidPoles','Serialized PoleSpan disagrees with winding PoleCount.');
@@ -215,6 +225,8 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
                 return;
             catch err
                 missingMex=~isempty(strfind(err.message,'mexmPhaseWL'));
+                % Numeric qc is accepted by the modern API and deliberately
+                % routes around legacy completedesign_AM's fr-only boundary.
                 numericQc=~isempty(strfind(err.message, 'must be an object of the ''fr'''));
                 if ~(missingMex || numericQc), rethrow(err); end
             end

@@ -1,4 +1,8 @@
 classdef RadialSlottedCoilGeometry < rnfoundry.em.winding.CoilGeometry
+    %RADIALSLOTTEDCOILGEOMETRY Reproducible radial-slot coil geometry.
+    %   Stores stack length, pitch length, slot width [m], explicit PackArea,
+    %   active lengths, and CoilInsulationThickness. The latter is slot-region
+    %   insulation and is distinct from conductor strand enamel.
     properties (SetAccess = private)
         ls
         PitchLength
@@ -35,9 +39,8 @@ classdef RadialSlottedCoilGeometry < rnfoundry.em.winding.CoilGeometry
     end
     methods (Static)
         function obj = fromStruct(s)
-            if ~isfield(s, 'Type') || ~strcmp(s.Type, 'RadialSlottedCoilGeometry')
-                error('rnfoundry:em:UnsupportedType', 'Unsupported coil geometry type.');
-            end
+            rnfoundry.em.validateStructEnvelope( ...
+                s, 'rnfoundry.em.winding.CoilGeometry', 'RadialSlottedCoilGeometry');
             obj = rnfoundry.em.winding.RadialSlottedCoilGeometry( ...
                 s.PackArea, s.ls, s.PitchLength, s.SlotWidth, ...
                 s.ActiveSegmentLengths, s.CoilInsulationThickness);

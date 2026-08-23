@@ -1,5 +1,8 @@
 function fullDiameter = insulatedWireDiameter(copperDiameter)
-%INSULATEDWIREDIAMETER Legacy enamel outside-diameter correlation.
+%INSULATEDWIREDIAMETER Return legacy enamel outside diameter.
+%   FULLDIAMETER = insulatedWireDiameter(COPPERDIAMETER) applies the
+%   piecewise legacy correlation to round-wire copper diameter in metres.
+%   This is the only RoundWireConductor insulation model in Milestone 1A.
 d = copperDiameter .* 1000;
 fullDiameter = NaN(size(d));
 i = d < 1.6;

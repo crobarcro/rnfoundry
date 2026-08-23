@@ -1,4 +1,8 @@
 classdef RadialPMField
+    %RADIALPMFIELD Canonical radial permanent-magnet field component.
+    %   Rmi/Rmo are inner/outer magnet radii [m]; Rbi/Rbo describe the
+    %   adjoining back iron. Materials are owned by this value object.
+    %   Rmm, Rbm and component thicknesses are dependent queries.
     properties (SetAccess = private)
         Rmi
         Rmo
@@ -27,17 +31,28 @@ classdef RadialPMField
             end
             obj.validate();
         end
-        function value = get.Rmm(obj), value = mean([obj.Rmi,obj.Rmo]); end
-        function value = get.Rbm(obj), value = mean([obj.Rbi,obj.Rbo]); end
-        function value = get.MagnetThickness(obj), value = obj.Rmo - obj.Rmi; end
-        function value = get.BackIronThickness(obj), value = abs(obj.Rbo - obj.Rbi); end
+        function value = get.Rmm(obj)
+            value = mean([obj.Rmi,obj.Rmo]);
+        end
+        function value = get.Rbm(obj)
+            value = mean([obj.Rbi,obj.Rbo]);
+        end
+        function value = get.MagnetThickness(obj)
+            value = obj.Rmo - obj.Rmi;
+        end
+        function value = get.BackIronThickness(obj)
+            value = abs(obj.Rbo - obj.Rbi);
+        end
         function validate(obj)
             radii = [obj.Rbi,obj.Rmi,obj.Rmo,obj.Rbo];
             if any(~isfinite(radii)) || any(radii <= 0)
                 error('rnfoundry:em:InvalidFieldRadii','All field radii must be positive and finite.');
             end
-            internalBackIron = obj.Rbi < obj.Rbo && obj.Rbo == obj.Rmi;
-            externalBackIron = obj.Rmi < obj.Rmo && obj.Rbi == obj.Rmo && obj.Rmo < obj.Rbo;
+            tolerance = 100 .* eps(max(radii));
+            internalBackIron = obj.Rbi < obj.Rbo ...
+                && abs(obj.Rbo - obj.Rmi) <= tolerance;
+            externalBackIron = abs(obj.Rbi - obj.Rmo) <= tolerance ...
+                && obj.Rmo < obj.Rbo;
             if ~(obj.Rmi < obj.Rmo) || ~(internalBackIron || externalBackIron)
                 error('rnfoundry:em:InvalidFieldRadii','Magnet and back-iron radial ordering is invalid.');
             end
@@ -58,6 +73,13 @@ classdef RadialPMField
                 'Rbi',obj.Rbi,'Rbo',obj.Rbo,'thetam',obj.thetam, ...
                 'MagnetSkew',obj.MagnetSkew,'MagnetMaterial',obj.MagnetMaterial, ...
                 'BackIronMaterial',obj.BackIronMaterial);
+        end
+    end
+    methods (Static)
+        function obj = fromStruct(s)
+            rnfoundry.em.validateStructEnvelope( ...
+                s, 'rnfoundry.em.rotary.radial.RadialPMField', 'RadialPMField');
+            obj = rnfoundry.em.rotary.radial.RadialPMField(s);
         end
     end
 end

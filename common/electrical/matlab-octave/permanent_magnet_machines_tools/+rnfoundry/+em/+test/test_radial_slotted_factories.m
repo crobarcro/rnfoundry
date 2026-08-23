@@ -20,20 +20,32 @@ for k=1:numel(cases)
     legacy=completedesign_RADIAL_SLOTTED(input,struct(),'tdims');
     modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromThicknesses(input);
     compareDesign(modern.toLegacyStruct(),legacy,c{1});
-    expectedMTL=rectcoilmtl(legacy.ls,legacy.yd*legacy.thetas*legacy.Rcm+legacy.thetas*legacy.Rcm/2,mean(legacy.thetac)*legacy.Rcm);
-    rnfoundry.em.test.assertNear(modern.Armature.Winding.MeanTurnLength,expectedMTL);
-    expectedR=wireresistancedc('round',modern.Armature.Winding.Conductor.EquivalentCopperDiameter,expectedMTL*modern.Armature.Winding.TurnsPerCoil,'Resistivity',1.9e-8);
-    rnfoundry.em.test.assertNear(modern.Armature.Winding.ReferenceDCCoilResistance,expectedR);
+    compareMTLResistance(modern,legacy);
 end
-% Exercise the no-MEX/numeric-qc ratio fallback, including ls reconstruction.
-[input,legacy]=rnfoundry.em.test.modeInput('external','ratios',2,'integral');
-input.qc=double(input.qc); input.WindingLayout=legacy.WindingLayout;
-modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromRatios(input);
-compareDesign(modern.toLegacyStruct(),legacy,'external');
-[input,legacy]=rnfoundry.em.test.modeInput('internal','ratios',2,'integral');
-input.qc=double(input.qc); input.WindingLayout=legacy.WindingLayout;
-modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromRatios(input);
-compareDesign(modern.toLegacyStruct(),legacy,'internal');
+% Force all six public factories through independent modern completion.
+% Numeric qc is intentionally rejected by completedesign_AM, while the supplied
+% known-good layout isolates modern winding/geometry completion from MEX access.
+for i=1:numel(modes)
+    for j=1:numel(positions)
+        [input,~]=rnfoundry.em.test.modeInput(positions{j},modes{i},2,'integral');
+        legacy=completedesign_RADIAL_SLOTTED(input,struct(),modes{i});
+        input.qc=double(input.qc);
+        input.WindingLayout=legacy.WindingLayout;
+        switch modes{i}
+            case 'ratios', modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromRatios(input);
+            case 'radims', modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromRadii(input);
+            otherwise, modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromThicknesses(input);
+        end
+        compareDesign(modern.toLegacyStruct(),legacy,positions{j});
+    end
+end
+% Explicit MTL/resistance characterization for external and internal double layer.
+for j=1:numel(positions)
+    [input,~]=rnfoundry.em.test.modeInput(positions{j},'tdims',2,'integral');
+    legacy=completedesign_RADIAL_SLOTTED(input,struct(),'tdims');
+    modern=rnfoundry.em.rotary.radial.SlottedPMMachine.fromThicknesses(input);
+    compareMTLResistance(modern,legacy);
+end
 end
 function compareDesign(actual,expected,position)
 if ~isfield(expected,'Branches'), expected.Branches=1; end
@@ -58,4 +70,17 @@ else
 end
 ratios=[ratios,{'tsgVtsb','thetamVthetap','thetacgVthetas','thetacyVthetas','thetasgVthetacg','lsVtm'}];
 for k=1:numel(ratios), rnfoundry.em.test.assertNear(actual.(ratios{k}),expected.(ratios{k})); end
+end
+
+function compareMTLResistance(modern,legacy)
+expectedMTL=rectcoilmtl(legacy.ls, ...
+    legacy.yd*legacy.thetas*legacy.Rcm+legacy.thetas*legacy.Rcm/2, ...
+    mean(legacy.thetac)*legacy.Rcm);
+rnfoundry.em.test.assertNear(modern.Armature.Winding.MeanTurnLength,expectedMTL);
+expectedR=wireresistancedc('round', ...
+    modern.Armature.Winding.Conductor.EquivalentCopperDiameter, ...
+    expectedMTL*modern.Armature.Winding.TurnsPerCoil, ...
+    'Resistivity',1.9e-8);
+rnfoundry.em.test.assertNear( ...
+    modern.Armature.Winding.ReferenceDCCoilResistance,expectedR);
 end

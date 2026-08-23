@@ -13,6 +13,15 @@ bad=s; bad.Armature.Winding.Layout=struct(); expect(bad,'rnfoundry:em:Unresolved
 bad=s; bad.Field.Rbi=-1; expect(bad,'rnfoundry:em:InvalidFieldRadii');
 bad=s; bad.Field.Rbo=bad.Field.Rbi; expectAny(bad);
 bad=s; bad.Field.thetam=2*bad.PoleSpan; expect(bad,'rnfoundry:em:InvalidMagnetAngle');
+bad=s; bad.Armature.thetacy=0; expect(bad,'rnfoundry:em:InvalidSlotGeometry');
+bad=s; bad.Armature.Rtsg=bad.Armature.Rtsb+.001; expect(bad,'rnfoundry:em:InvalidRadialOrder');
+bad=s; bad.Armature.Winding.Layout.Coils=bad.Armature.Winding.Layout.Coils(:,1:end-1); expect(bad,'rnfoundry:em:InvalidWindingLayout');
+bad=s; bad.Armature.Winding.Layout.Coils(1)=bad.Armature.Winding.SlotCount+1; expect(bad,'rnfoundry:em:InvalidWindingLayout');
+bad=s; bad.Armature.Winding.Layout.Coils(1)=1.5; expect(bad,'rnfoundry:em:InvalidWindingLayout');
+bad=s; bad.Armature.Winding.Layout.Phases=bad.Armature.Winding.Layout.Phases(1:end-1,:); expect(bad,'rnfoundry:em:InvalidWindingLayout');
+bad=s; bad.Armature.Winding.Layout.Phases=bad.Armature.Winding.Layout.Phases(:,1); expect(bad,'rnfoundry:em:InvalidWindingLayout');
+bad=s; bad.Armature.Winding.Layout.Phases(1)=bad.Armature.Winding.PhaseCount+1; expect(bad,'rnfoundry:em:InvalidWindingLayout');
+bad=s; bad.Armature.Winding.Conductor.Insulation.Type='Unsupported'; expect(bad,'rnfoundry:em:UnsupportedInsulation');
 % Missing generated and supplied layout must fail clearly in the no-MEX path.
 raw=input; raw.qc=double(raw.qc); if isfield(raw,'WindingLayout'), raw=rmfield(raw,'WindingLayout'); end
 oldPath=path(); cleanup=onCleanup(@() path(oldPath));

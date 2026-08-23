@@ -1,4 +1,9 @@
 classdef SlottedArmature
+    %SLOTTEDARMATURE Canonical radial slotted armature value object.
+    %   Position is 'internal' or 'external'. Ra is the orientation-neutral
+    %   air-gap-facing armature radius and maps to legacy Rao or Rai.
+    %   Compact Ryi/Ryo/Rtsb/Rtsg notation denotes radial surfaces [m].
+    %   tc is full coil-slot depth and tcb is its base section; Rcb is derived.
     properties (SetAccess = private)
         Position
         Ryi
@@ -75,13 +80,16 @@ classdef SlottedArmature
                 error('rnfoundry:em:InvalidSlotGeometry','Yoke or tc/tcb geometry is invalid.');
             end
             if ~(obj.thetasg >= 0 && obj.thetasg < obj.thetacg ...
-                    && obj.thetacg <= obj.thetas && obj.thetacy <= obj.thetas)
+                    && obj.thetacg <= obj.thetas ...
+                    && obj.thetacy > 0 && obj.thetacy <= obj.thetas)
                 error('rnfoundry:em:InvalidSlotGeometry','Angular slot geometry is invalid.');
             end
             if strcmp(obj.Position,'external')
-                ordered = obj.Ra < obj.Rtsb && obj.Rtsb < obj.Ryi && obj.Rtsg >= obj.Ra;
+                ordered = obj.Ra < obj.Rtsb && obj.Rtsb < obj.Ryi ...
+                    && obj.Rtsg >= obj.Ra && obj.Rtsg <= obj.Rtsb;
             else
-                ordered = obj.Ryo < obj.Rtsb && obj.Rtsb < obj.Ra && obj.Rtsg <= obj.Ra;
+                ordered = obj.Ryo < obj.Rtsb && obj.Rtsb < obj.Ra ...
+                    && obj.Rtsg <= obj.Ra && obj.Rtsg >= obj.Rtsb;
             end
             if ~ordered
                 error('rnfoundry:em:InvalidRadialOrder','Armature radial ordering is invalid.');
@@ -98,6 +106,15 @@ classdef SlottedArmature
                 'Ra',obj.Ra,'tc',obj.tc,'tcb',obj.tcb,'thetasg',obj.thetasg, ...
                 'thetacg',obj.thetacg,'thetacy',obj.thetacy, ...
                 'IronMaterial',obj.IronMaterial,'Winding',obj.Winding.toStruct());
+        end
+    end
+    methods (Static)
+        function obj = fromStruct(s)
+            rnfoundry.em.validateStructEnvelope( ...
+                s, 'rnfoundry.em.rotary.radial.SlottedArmature', 'SlottedArmature');
+            armatureStruct = s;
+            armatureStruct.Winding = rnfoundry.em.winding.Winding.fromStruct(s.Winding);
+            obj = rnfoundry.em.rotary.radial.SlottedArmature(armatureStruct);
         end
     end
 end
