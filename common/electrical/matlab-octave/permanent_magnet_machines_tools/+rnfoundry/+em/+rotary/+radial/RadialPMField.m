@@ -1,21 +1,63 @@
 classdef RadialPMField
-    properties
-        Rmi=NaN; Rmo=NaN; Rbi=NaN; Rbo=NaN
-        thetam=NaN; MagnetSkew=0; MagnetMaterial=struct(); BackIronMaterial=struct()
+    properties (SetAccess = private)
+        Rmi
+        Rmo
+        Rbi
+        Rbo
+        thetam
+        MagnetSkew
+        MagnetMaterial
+        BackIronMaterial
     end
     properties (Dependent)
-        Rmm; Rbm; MagnetThickness
+        Rmm
+        Rbm
+        MagnetThickness
+        BackIronThickness
     end
     methods
-        function obj=RadialPMField(s), if nargin>0, n=fieldnames(s); allowed={'Rmi','Rmo','Rbi','Rbo','thetam','MagnetSkew','MagnetMaterial','BackIronMaterial'}; for k=1:numel(n), if any(strcmp(n{k},allowed)), obj.(n{k})=s.(n{k}); end; end; end; end
-        function v=get.Rmm(obj), v=mean([obj.Rmi obj.Rmo]); end
-        function v=get.Rbm(obj), v=mean([obj.Rbi obj.Rbo]); end
-        function v=get.MagnetThickness(obj), v=obj.Rmo-obj.Rmi; end
-        function validate(obj)
-            if any(~isfinite([obj.Rbi obj.Rmi obj.Rmo obj.Rbo]))||~(obj.Rmi<obj.Rmo), error('rnfoundry:em:InvalidFieldRadii','Field radii are invalid.'); end
-            if ~(obj.Rbi==obj.Rmo || obj.Rbo==obj.Rmi), error('rnfoundry:em:InvalidBackIron','Back iron must meet one magnet surface.'); end
-            if ~(obj.thetam>0), error('rnfoundry:em:InvalidMagnetAngle','thetam must be positive.'); end
+        function obj = RadialPMField(s)
+            names = {'Rmi','Rmo','Rbi','Rbo','thetam','MagnetSkew', ...
+                     'MagnetMaterial','BackIronMaterial'};
+            for k = 1:numel(names)
+                if ~isfield(s,names{k})
+                    error('rnfoundry:em:MissingFieldProperty','Missing field property %s.',names{k});
+                end
+                obj.(names{k}) = s.(names{k});
+            end
+            obj.validate();
         end
-        function s=toStruct(obj), s=struct('Type','RadialPMField','Rmi',obj.Rmi,'Rmo',obj.Rmo,'Rbi',obj.Rbi,'Rbo',obj.Rbo,'thetam',obj.thetam,'MagnetSkew',obj.MagnetSkew,'MagnetMaterial',obj.MagnetMaterial,'BackIronMaterial',obj.BackIronMaterial); end
+        function value = get.Rmm(obj), value = mean([obj.Rmi,obj.Rmo]); end
+        function value = get.Rbm(obj), value = mean([obj.Rbi,obj.Rbo]); end
+        function value = get.MagnetThickness(obj), value = obj.Rmo - obj.Rmi; end
+        function value = get.BackIronThickness(obj), value = abs(obj.Rbo - obj.Rbi); end
+        function validate(obj)
+            radii = [obj.Rbi,obj.Rmi,obj.Rmo,obj.Rbo];
+            if any(~isfinite(radii)) || any(radii <= 0)
+                error('rnfoundry:em:InvalidFieldRadii','All field radii must be positive and finite.');
+            end
+            internalBackIron = obj.Rbi < obj.Rbo && obj.Rbo == obj.Rmi;
+            externalBackIron = obj.Rmi < obj.Rmo && obj.Rbi == obj.Rmo && obj.Rmo < obj.Rbo;
+            if ~(obj.Rmi < obj.Rmo) || ~(internalBackIron || externalBackIron)
+                error('rnfoundry:em:InvalidFieldRadii','Magnet and back-iron radial ordering is invalid.');
+            end
+            if ~(obj.MagnetThickness > 0 && obj.BackIronThickness > 0)
+                error('rnfoundry:em:InvalidFieldThickness','Magnet and back-iron thickness must be positive.');
+            end
+            if ~(isscalar(obj.thetam) && isfinite(obj.thetam) && obj.thetam > 0)
+                error('rnfoundry:em:InvalidMagnetAngle','thetam must be positive and finite.');
+            end
+            if ~(isscalar(obj.MagnetSkew) && isfinite(obj.MagnetSkew) ...
+                    && obj.MagnetSkew >= 0 && obj.MagnetSkew <= 1)
+                error('rnfoundry:em:InvalidMagnetSkew','MagnetSkew must be in [0, 1].');
+            end
+        end
+        function s = toStruct(obj)
+            s = struct('Schema','rnfoundry.em.rotary.radial.RadialPMField', ...
+                'SchemaVersion',1,'Type','RadialPMField','Rmi',obj.Rmi,'Rmo',obj.Rmo, ...
+                'Rbi',obj.Rbi,'Rbo',obj.Rbo,'thetam',obj.thetam, ...
+                'MagnetSkew',obj.MagnetSkew,'MagnetMaterial',obj.MagnetMaterial, ...
+                'BackIronMaterial',obj.BackIronMaterial);
+        end
     end
 end

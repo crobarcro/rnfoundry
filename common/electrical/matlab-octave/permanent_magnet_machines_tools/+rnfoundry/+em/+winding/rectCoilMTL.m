@@ -1,4 +1,7 @@
-function length = rectCoilMTL(depth,height,thickness)
-sidelen = sqrt((height+thickness).^2);
-length = 2.*sidelen + 2.*depth + 2.*thickness + pi.*thickness;
+function length = rectCoilMTL(depth, height, thickness)
+%RECTCOILMTL Modern namespace form of the legacy rectangular-coil kernel.
+length = 2 .* (height + thickness) ...
+       + 2 .* depth ...
+       + 2 .* thickness ...
+       + pi .* thickness;
 end

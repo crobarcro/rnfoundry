@@ -1,31 +1,103 @@
 classdef SlottedArmature
-    properties
-        Position='external'; Ryi=NaN; Ryo=NaN; Rtsb=NaN; Rtsg=NaN; Ra=NaN
-        tc=NaN; tcb=NaN; ty=NaN; tsb=NaN; tsg=NaN
-        thetas=NaN; thetasg=NaN; thetacg=NaN; thetacy=NaN
-        IronMaterial=struct(); Winding=[]
+    properties (SetAccess = private)
+        Position
+        Ryi
+        Ryo
+        Rtsb
+        Rtsg
+        Ra
+        tc
+        tcb
+        thetasg
+        thetacg
+        thetacy
+        IronMaterial
+        Winding
     end
     properties (Dependent)
-        Rym; Rci; Rco; Rcm; Rcb; thetac; tcbVtc
+        ty
+        tsb
+        tsg
+        thetas
+        Rym
+        Rci
+        Rco
+        Rcm
+        Rcb
+        thetac
+        tcbVtc
     end
     methods
-        function obj=SlottedArmature(s), if nargin>0, n=fieldnames(s); allowed={'Position','Ryi','Ryo','Rtsb','Rtsg','Ra','tc','tcb','ty','tsb','tsg','thetas','thetasg','thetacg','thetacy','IronMaterial','Winding'}; for k=1:numel(n), if any(strcmp(n{k},allowed)), obj.(n{k})=s.(n{k}); end; end; end; end
-        function v=get.Rym(obj), v=mean([obj.Ryi obj.Ryo]); end
-        function v=get.Rci(obj), if strcmp(obj.Position,'external'), v=obj.Rtsb; else, v=obj.Ryo; end; end
-        function v=get.Rco(obj), if strcmp(obj.Position,'external'), v=obj.Ryi; else, v=obj.Rtsb; end; end
-        function v=get.Rcm(obj), v=mean([obj.Rci obj.Rco]); end
-        function v=get.Rcb(obj), if strcmp(obj.Position,'external'), v=obj.Rco-obj.tcb; else, v=obj.Rci+obj.tcb; end; end
-        function v=get.thetac(obj), v=[obj.thetacg obj.thetacy]; end
-        function v=get.tcbVtc(obj), v=obj.tcb/obj.tc; end
+        function obj = SlottedArmature(s)
+            names = {'Position','Ryi','Ryo','Rtsb','Rtsg','Ra','tc','tcb', ...
+                     'thetasg','thetacg','thetacy','IronMaterial','Winding'};
+            for k = 1:numel(names)
+                if ~isfield(s,names{k})
+                    error('rnfoundry:em:MissingArmatureProperty','Missing armature property %s.',names{k});
+                end
+                obj.(names{k}) = s.(names{k});
+            end
+            obj.validate();
+        end
+        function value = get.ty(obj), value = obj.Ryo - obj.Ryi; end
+        function value = get.tsb(obj)
+            if strcmp(obj.Position,'external'), value = obj.Rtsb - obj.Ra;
+            else, value = obj.Ra - obj.Rtsb; end
+        end
+        function value = get.tsg(obj), value = abs(obj.Rtsg - obj.Ra); end
+        function value = get.thetas(obj), value = 2*pi ./ obj.Winding.SlotCount; end
+        function value = get.Rym(obj), value = mean([obj.Ryi,obj.Ryo]); end
+        function value = get.Rci(obj)
+            if strcmp(obj.Position,'external'), value = obj.Rtsb;
+            else, value = obj.Ryo; end
+        end
+        function value = get.Rco(obj)
+            if strcmp(obj.Position,'external'), value = obj.Ryi;
+            else, value = obj.Rtsb; end
+        end
+        function value = get.Rcm(obj), value = mean([obj.Rci,obj.Rco]); end
+        function value = get.Rcb(obj)
+            if strcmp(obj.Position,'external'), value = obj.Rco - obj.tcb;
+            else, value = obj.Rci + obj.tcb; end
+        end
+        function value = get.thetac(obj), value = [obj.thetacg,obj.thetacy]; end
+        function value = get.tcbVtc(obj), value = obj.tcb ./ obj.tc; end
         function validate(obj)
-            if ~any(strcmp(obj.Position,{'internal','external'})), error('rnfoundry:em:InvalidPosition','Position must be internal or external.'); end
-            vals=[obj.Ryi obj.Ryo obj.Rtsb obj.Rtsg obj.Ra obj.tc obj.tcb obj.ty obj.tsb obj.tsg obj.thetas obj.thetasg obj.thetacg obj.thetacy];
-            if any(~isfinite(vals))||any(vals<0)||any(vals([1:9 11:14])==0), error('rnfoundry:em:InvalidArmatureGeometry','Armature dimensions must be positive.'); end
-            if ~(obj.Ryi<obj.Ryo) || obj.tcb>obj.tc || obj.thetasg>=obj.thetacg || obj.thetacg>obj.thetas || obj.thetacy>obj.thetas, error('rnfoundry:em:InvalidSlotGeometry','Slot geometry is inconsistent.'); end
-            if strcmp(obj.Position,'external') && ~(obj.Ra<obj.Rtsb && obj.Rtsb<obj.Ryi), error('rnfoundry:em:InvalidRadialOrder','External armature radii are inconsistent.'); end
-            if strcmp(obj.Position,'internal') && ~(obj.Ryo<obj.Rtsb && obj.Rtsb<obj.Ra), error('rnfoundry:em:InvalidRadialOrder','Internal armature radii are inconsistent.'); end
+            if ~(strcmp(obj.Position,'internal') || strcmp(obj.Position,'external'))
+                error('rnfoundry:em:InvalidPosition','Position must be internal or external.');
+            end
+            values = [obj.Ryi,obj.Ryo,obj.Rtsb,obj.Rtsg,obj.Ra,obj.tc,obj.tcb, ...
+                      obj.thetasg,obj.thetacg,obj.thetacy];
+            if any(~isfinite(values)) || any(values(1:6) <= 0) || obj.tcb < 0
+                error('rnfoundry:em:InvalidArmatureGeometry','Armature geometry is not positive and finite.');
+            end
+            if ~(obj.Ryi < obj.Ryo) || obj.tcb > obj.tc
+                error('rnfoundry:em:InvalidSlotGeometry','Yoke or tc/tcb geometry is invalid.');
+            end
+            if ~(obj.thetasg >= 0 && obj.thetasg < obj.thetacg ...
+                    && obj.thetacg <= obj.thetas && obj.thetacy <= obj.thetas)
+                error('rnfoundry:em:InvalidSlotGeometry','Angular slot geometry is invalid.');
+            end
+            if strcmp(obj.Position,'external')
+                ordered = obj.Ra < obj.Rtsb && obj.Rtsb < obj.Ryi && obj.Rtsg >= obj.Ra;
+            else
+                ordered = obj.Ryo < obj.Rtsb && obj.Rtsb < obj.Ra && obj.Rtsg <= obj.Ra;
+            end
+            if ~ordered
+                error('rnfoundry:em:InvalidRadialOrder','Armature radial ordering is invalid.');
+            end
+            if abs(obj.tc - abs(obj.Rco-obj.Rci)) > 10*eps(max(obj.tc,1))
+                error('rnfoundry:em:InconsistentGeometry','tc disagrees with the coil radii.');
+            end
             obj.Winding.validate();
         end
-        function s=toStruct(obj), s=struct('Type','SlottedArmature','Position',obj.Position,'Ryi',obj.Ryi,'Ryo',obj.Ryo,'Rtsb',obj.Rtsb,'Rtsg',obj.Rtsg,'Ra',obj.Ra,'tc',obj.tc,'tcb',obj.tcb,'ty',obj.ty,'tsb',obj.tsb,'tsg',obj.tsg,'thetas',obj.thetas,'thetasg',obj.thetasg,'thetacg',obj.thetacg,'thetacy',obj.thetacy,'IronMaterial',obj.IronMaterial,'Winding',obj.Winding.toStruct()); end
+        function s = toStruct(obj)
+            s = struct('Schema','rnfoundry.em.rotary.radial.SlottedArmature', ...
+                'SchemaVersion',1,'Type','SlottedArmature','Position',obj.Position, ...
+                'Ryi',obj.Ryi,'Ryo',obj.Ryo,'Rtsb',obj.Rtsb,'Rtsg',obj.Rtsg, ...
+                'Ra',obj.Ra,'tc',obj.tc,'tcb',obj.tcb,'thetasg',obj.thetasg, ...
+                'thetacg',obj.thetacg,'thetacy',obj.thetacy, ...
+                'IronMaterial',obj.IronMaterial,'Winding',obj.Winding.toStruct());
+        end
     end
 end
