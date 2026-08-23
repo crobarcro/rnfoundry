@@ -4,7 +4,6 @@ classdef Machine
     %   motion coordinate (metres for linear machines, radians for rotary
     %   machines). Stored state has private setters. Use versioned structs
     %   returned by toStruct for persistence rather than saved class objects.
-    %MACHINE Base value type for canonical electromagnetic machines.
     properties (SetAccess = private)
         PoleSpan
     end

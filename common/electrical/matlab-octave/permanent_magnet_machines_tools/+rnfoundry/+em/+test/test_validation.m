@@ -1,6 +1,16 @@
 function test_validation()
 [input,~]=rnfoundry.em.test.modeInput('external','tdims',2,'integral');
 m=rnfoundry.em.rotary.radial.SlottedPMMachine.fromThicknesses(input); s=m.toStruct();
+% External armature requires field back iron inward of the magnets.
+bad=s; fieldBackIronThickness=bad.Field.Rbo-bad.Field.Rbi;
+bad.Field.Rbi=bad.Field.Rmo; bad.Field.Rbo=bad.Field.Rmo+fieldBackIronThickness;
+expect(bad,'rnfoundry:em:InvalidFieldOrientation');
+% Internal armature requires field back iron outward of the magnets.
+[internalInput,~]=rnfoundry.em.test.modeInput('internal','tdims',2,'integral');
+internalMachine=rnfoundry.em.rotary.radial.SlottedPMMachine.fromThicknesses(internalInput);
+bad=internalMachine.toStruct(); fieldBackIronThickness=bad.Field.Rbo-bad.Field.Rbi;
+bad.Field.Rbo=bad.Field.Rmi; bad.Field.Rbi=bad.Field.Rmi-fieldBackIronThickness;
+expect(bad,'rnfoundry:em:InvalidFieldOrientation');
 bad=s; bad.PoleSpan=bad.PoleSpan*2; expect(bad,'rnfoundry:em:InvalidPoles');
 bad=s; bad.Armature.Winding.SlotCount=bad.Armature.Winding.SlotCount+1; expectAny(bad);
 bad=s; bad.Armature.tc=bad.Armature.tc*.9; expect(bad,'rnfoundry:em:InconsistentGeometry');
@@ -25,8 +35,14 @@ bad=s; bad.Armature.Winding.Conductor.Insulation.Type='Unsupported'; expect(bad,
 % Missing generated and supplied layout must fail clearly in the no-MEX path.
 raw=input; raw.qc=double(raw.qc); if isfield(raw,'WindingLayout'), raw=rmfield(raw,'WindingLayout'); end
 oldPath=path(); cleanup=onCleanup(@() path(oldPath));
-mexPath=fullfile(tempdir(),'rnfoundry-em-m1a-mex');
-if exist(mexPath,'dir'), rmpath(mexPath); end
+% Hide every active mexmPhaseWL location, not only the temporary test build.
+activeMex=which('mexmPhaseWL');
+while ~isempty(activeMex)
+    mexDirectory=fileparts(activeMex);
+    if isempty(mexDirectory), break; end
+    rmpath(mexDirectory);
+    activeMex=which('mexmPhaseWL');
+end
 % Numeric qc forces modern completion. Without mexmPhaseWL it must fail explicitly.
 rnfoundry.em.test.assertError( ...
     @() rnfoundry.em.rotary.radial.SlottedPMMachine.fromThicknesses(raw), ...

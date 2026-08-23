@@ -51,6 +51,18 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
             validate@rnfoundry.em.Machine(obj);
             obj.Field.validate();
             obj.Armature.validate();
+            fieldScale = max([obj.Field.Rbi,obj.Field.Rmi, ...
+                              obj.Field.Rmo,obj.Field.Rbo]);
+            fieldTolerance = 100 .* eps(fieldScale);
+            if strcmp(obj.Armature.Position,'external')
+                orientationValid = abs(obj.Field.Rbo-obj.Field.Rmi) <= fieldTolerance;
+            else
+                orientationValid = abs(obj.Field.Rbi-obj.Field.Rmo) <= fieldTolerance;
+            end
+            if ~orientationValid
+                error('rnfoundry:em:InvalidFieldOrientation', ...
+                      'Field back-iron orientation is incompatible with Armature.Position.');
+            end
             if ~(isscalar(obj.ls) && isfinite(obj.ls) && obj.ls > 0)
                 error('rnfoundry:em:InvalidStackLength','ls must be a positive finite scalar.');
             end
