@@ -1,0 +1,9 @@
+function length = rectCoilMTL(depth, height, thickness)
+%RECTCOILMTL Calculate radial-slotted mean turn length in metres.
+%   Uses the exact legacy rectcoilmtl/isotrapzcoilmtl rectangular formula.
+%   DEPTH, HEIGHT and THICKNESS are winding-envelope dimensions in metres.
+length = 2 .* (height + thickness) ...
+       + 2 .* depth ...
+       + 2 .* thickness ...
+       + pi .* thickness;
+end
