@@ -15,7 +15,17 @@ for position={'external','internal'}
 
     c=b; c(4)=1; [~,d]=parity(c,p); assert(d.tsb/d.tc(1)<=.9+eps);
     c=b; c(3)=1.5; [~,d]=parity(c,p); assert(d.tc(1)<=.2+eps);
-    c=b; c(3)=1e-4; [~,d]=parity(c,p); assert(d.tc(1)>c(3)*.2);
+    % Isolated ordinary minimum-tc repair: shoe/origin/max/g/angle inactive.
+    c=b; c(3)=.005; c(4)=0; c(10)=.5; c(11)=.5;
+    options=struct('ArmatureType',p,'Min_tc',.005);
+    space=rnfoundry.em.optim.RadialSlottedDesignSpace(options);
+    pre=rnfoundry.em.test.initialRadialSlottedRepairState(space,c);
+    assert(pre.tsb==0 && pre.tc(1)<space.Options.Min_tc && ...
+           pre.tc(1)<space.Options.Max_tc && pre.g>=space.Options.Min_g);
+    assert((strcmp(p,'external') && pre.Rbi>=1e-4) || ...
+           (strcmp(p,'internal') && pre.Ryi>=1e-4));
+    [~,d]=parity(c,p,struct('Min_tc',.005));
+    assert(abs(d.tc(1)-space.Options.Min_tc)<1e-12);
 
     % A shallow shoe and zero tip ratio genuinely satisfy the <15 degree test.
     c=b; c(4)=.001; c(5)=0; [~,d]=parity(c,p);

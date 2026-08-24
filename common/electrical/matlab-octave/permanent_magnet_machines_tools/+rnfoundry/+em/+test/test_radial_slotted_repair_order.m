@@ -11,7 +11,7 @@ fixtures={ ...
 for k=1:size(fixtures,1)
     chrom=fixtures{k,2};
     position='external'; if k==6, position='internal'; end
-    sim=struct(); if k==5, sim.MaxStrandDiameter=.6e-3; end
+    sim=struct();
     options=struct('ArmatureType',position);
     if k==2, options.Max_tc=.001; options.Min_tc=1e-4; end
     if k==3, options.Min_tc=1e-4; end
@@ -48,8 +48,15 @@ for k=1:size(fixtures,1)
             assert(abs(legacy.RmiVRmo-legacy.Rmi/legacy.Rmo)<1e-13);
             assert(abs(legacy.RmoVRai-legacy.Rmo/legacy.Rai)<1e-13);
         case 5 % opening-derived limit subsequently changes strand construction
+            assert(~isfield(sim,'MaxStrandDiameter'));
             assert(isfield(modernSim,'MaxStrandDiameter') && ...
                    modernSim.MaxStrandDiameter==legacySim.MaxStrandDiameter);
+            expectedLimit=legacySim.MinStrandDiameter*1.001;
+            assert(abs(legacySim.MaxStrandDiameter-expectedLimit)<1e-15);
+            unconstrainedDc=sqrt(4*legacy.Hc*legacy.Wc*legacy.CoilFillFactor* ...
+                chrom(15)/pi);
+            candidateStrandDiameter=unconstrainedDc/sqrt(1);
+            assert(candidateStrandDiameter>legacySim.MaxStrandDiameter);
             assert(legacy.WireStrandDiameter<=legacySim.MaxStrandDiameter);
             assert(legacy.NStrands>1);
         case 6 % small internal stack, minimum tc, then slot-angle growth
