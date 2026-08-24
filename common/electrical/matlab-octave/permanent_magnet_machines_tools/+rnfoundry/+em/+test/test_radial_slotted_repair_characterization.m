@@ -1,0 +1,131 @@
+function test_radial_slotted_repair_characterization()
+%TEST_RADIAL_SLOTTED_REPAIR_CHARACTERIZATION Prove each repair consequence.
+b=baseChrom();
+
+% Decode-time construction clamps and winding rounding.
+c=b; c(7)=1e-4; [~,d]=parity(c,'external'); assert(abs(d.tm-1e-3)<1e-14);
+c=b; c(8)=1e-4; [~,d]=parity(c,'external'); assert(abs(d.tbi-1e-3)<1e-14);
+c=b; c(2)=1e-4; [~,d]=parity(c,'external'); assert(abs(d.ty-1e-3)<1e-14);
+c=b; c(14)=5.6; [~,d]=parity(c,'external'); assert(d.NBasicWindings==6);
+
+for position={'external','internal'}
+    p=position{1};
+    c=b; c(1)=.03; [~,d]=parity(c,p);
+    if strcmp(p,'external'), assert(d.Rbi>=1e-4); else, assert(d.Ryi>=1e-4); end
+
+    c=b; c(4)=1; [~,d]=parity(c,p); assert(d.tsb/d.tc(1)<=.9+eps);
+    c=b; c(3)=1.5; [~,d]=parity(c,p); assert(d.tc(1)<=.2+eps);
+    % Isolated ordinary minimum-tc repair: shoe/origin/max/g/angle inactive.
+    c=b; c(3)=.005; c(4)=0; c(10)=.5; c(11)=.5;
+    options=struct('ArmatureType',p,'Min_tc',.005);
+    space=rnfoundry.em.optim.RadialSlottedDesignSpace(options);
+    pre=rnfoundry.em.test.initialRadialSlottedRepairState(space,c);
+    assert(pre.tsb==0 && pre.tc(1)<space.Options.Min_tc && ...
+           pre.tc(1)<space.Options.Max_tc && pre.g>=space.Options.Min_g);
+    assert((strcmp(p,'external') && pre.Rbi>=1e-4) || ...
+           (strcmp(p,'internal') && pre.Ryi>=1e-4));
+    [~,d]=parity(c,p,struct('Min_tc',.005));
+    assert(abs(d.tc(1)-space.Options.Min_tc)<1e-12);
+
+    % A shallow shoe and zero tip ratio genuinely satisfy the <15 degree test.
+    c=b; c(4)=.001; c(5)=0; [~,d]=parity(c,p);
+    assert(d.tsb==0 && d.tsg==0);
+
+    c=b; c(6)=1e-7; [~,d]=parity(c,p); assert(d.g>=.5e-3-eps);
+
+    % Isolated slot-side repair: no shoe, tc/g bounds inactive.
+    c=b; c(3)=.005; c(4)=0;
+    if strcmp(p,'external'), c(10)=.99; c(11)=.1;
+    else, c(10)=.1; c(11)=.99; end
+    options=struct('ArmatureType',p,'Min_tc',1e-4);
+    space=rnfoundry.em.optim.RadialSlottedDesignSpace(options);
+    pre=rnfoundry.em.test.initialRadialSlottedRepairState(space,c);
+    assert(pre.tsb==0 && pre.tc(1)<space.Options.Max_tc && ...
+           pre.tc(1)>space.Options.Min_tc && pre.g>=space.Options.Min_g);
+    pre.tc(2)=pre.tc(1)*space.Options.tc2Vtc1;
+    preAngle=slotSideAngle(pre,p);
+    newtc=requiredSlotSideTc(pre,p,space.Options.tc2Vtc1);
+    assert(preAngle<deg2rad(5) && newtc>pre.tc(1));
+    [~,d]=parity(c,p,struct('Min_tc',1e-4));
+    assert(abs(d.tc(1)-newtc)<1e-12);
+    assert(slotSideAngle(d,p)>=deg2rad(5)-1e-10);
+
+    c=b; c(11)=1e-5; [~,d]=parity(c,p);
+    assert(abs(d.tc(2)-.1*d.tc(1))>1e-12);
+end
+
+% Internal minimum-tc secondary shift, proven at the actual pre-branch state.
+c=b; c(1)=.027; c(3)=.005; c(4)=0; c(10)=.5; c(11)=.5;
+options=struct('ArmatureType','internal','Min_tc',.01);
+space=rnfoundry.em.optim.RadialSlottedDesignSpace(options);
+pre=rnfoundry.em.test.initialRadialSlottedRepairState(space,c);
+rshift=space.Options.Min_tc-pre.tc(1);
+assert(pre.tc(1)<space.Options.Min_tc && rshift>=pre.Ryi);
+rshift2=pre.Ryi-rshift+1e-5;
+[~,d]=parity(c,'internal',struct('Min_tc',.01));
+assert(abs(d.Rbo-(pre.Rbo+rshift2))<1e-12);
+assert(d.tc(1)>=space.Options.Min_tc-1e-12);
+
+% Internal slot-angle secondary stack shift, isolated from earlier repairs.
+c=b; c(1)=.023; c(3)=.005; c(4)=0; c(10)=100; c(11)=.1;
+options=struct('ArmatureType','internal','Min_tc',1e-4);
+space=rnfoundry.em.optim.RadialSlottedDesignSpace(options);
+pre=rnfoundry.em.test.initialRadialSlottedRepairState(space,c);
+pre.tc(2)=pre.tc(1)*space.Options.tc2Vtc1;
+newtc=requiredSlotSideTc(pre,'internal',space.Options.tc2Vtc1);
+rshift=newtc-pre.tc(1);
+assert(slotSideAngle(pre,'internal')<deg2rad(5) && rshift>=pre.Ryi);
+rshift2=pre.Ryi-rshift;
+[~,d]=parity(c,'internal',struct('Min_tc',1e-4));
+assert(abs(d.Rbo-(pre.Rbo+rshift2))<1e-12);
+assert(abs(d.tc(1)-newtc)<1e-12);
+
+% Both overlap repairs change their requested angular ratios.
+c=b; c(11)=1.2; [~,d]=parity(c,'external');
+assert(abs(d.thetacyVthetas-c(11))>1e-8);
+c=b; c(10)=1.2; [~,d]=parity(c,'external');
+assert(abs(d.thetacgVthetas-c(10))>1e-8);
+
+% Slot opening: unchanged large case, enlarged case, and capped case.
+c=b; [~,d,ms,ls]=parity(c,'external'); assert(isfield(ls,'MaxStrandDiameter'));
+assert(isfield(ms,'MaxStrandDiameter') && d.thetasg>0);
+c=b; c(12)=1e-4; [~,d]=parity(c,'external');
+assert(d.thetasg>=0 && d.thetasgVthetacg>c(12));
+c=b; c(10)=1e-4; c(12)=1e-4; [~,d]=parity(c,'external');
+assert(d.thetasgVthetacg<1 || d.thetasg==0);
+
+% Strand clamps and branch-factor selection.
+c=b; c(15)=1e-10; [~,d]=parity(c,'internal'); assert(abs(d.WireStrandDiameter-.5e-3)<1e-14);
+c=b; [~,d]=parity(c,'internal',struct(),struct('MaxStrandDiameter',.6e-3));
+assert(d.WireStrandDiameter<=.6e-3 && d.NStrands>1);
+for branch=[0,.1,.49,.51,.9,1]
+    c=b; c(16)=branch; [~,d]=parity(c,'internal');
+    assert(rem(d.NCoilsPerPhase,d.Branches)==0);
+    assert(d.CoilsPerBranch==d.NCoilsPerPhase/d.Branches);
+end
+end
+
+function [modern,legacy,modernSim,legacySim]=parity(chrom,position,extraOptions,sim)
+if nargin<3, extraOptions=struct(); end
+if nargin<4, sim=struct(); end
+extraOptions.ArmatureType=position;
+[modern,legacy,modernSim,legacySim]= ...
+    rnfoundry.em.test.assertCandidateLegacyParity(chrom,extraOptions,sim);
+end
+function angle=slotSideAngle(d,p)
+if strcmp(p,'external'), a=d.thetacg*d.Rci; b=d.thetacy*d.Rco;
+else, a=d.thetacg*d.Rco; b=d.thetacy*d.Rci; end
+angle=atan((d.tc(1)-d.tc(2))/abs((a-b)/2));
+end
+function newtc=requiredSlotSideTc(d,p,ratio)
+if strcmp(p,'external'), a=d.thetacg*d.Rci; b=d.thetacy*d.Rco;
+else, a=d.thetacg*d.Rco; b=d.thetacy*d.Rci; end
+newtc=tan(deg2rad(5))*abs((a-b)/2)/(1-ratio);
+end
+function angle=slotBaseAngle(d,p)
+if strcmp(p,'external'), radius=d.Rco-d.tc(2); else, radius=d.Ryo+d.tc(2); end
+angle=2*atan((d.thetacy/2)*radius/d.tc(2));
+end
+function c=baseChrom()
+c=[.32;.8;.2;.1;.5;.002;.1;2;.8;.7;.6;.4;.05;5.2;.025;.7];
+end
