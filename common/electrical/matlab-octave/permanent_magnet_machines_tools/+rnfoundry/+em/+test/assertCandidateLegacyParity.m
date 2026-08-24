@@ -1,12 +1,13 @@
-function [modern,legacy] = assertCandidateLegacyParity(chrom,options,simoptions)
+function [modern,legacy,modernSimOptions,legacySimOptions] = assertCandidateLegacyParity(chrom,options,simoptions)
 %ASSERTCANDIDATELEGACYPARITY Compare independent repair with legacy oracle.
 if nargin<3, simoptions=struct(); end
 space=rnfoundry.em.optim.RadialSlottedDesignSpace(options,simoptions);
 [candidate,~]=space.repair(space.decode(chrom));
 modern=candidate.toLegacyStruct();
+modernSimOptions=candidate.Compatibility.SimOptions;
 names=fieldnames(options); args=cell(1,2*numel(names));
 for k=1:numel(names), args{2*k-1}=names{k}; args{2*k}=options.(names{k}); end
-[legacy,~]=chrom2design_RADIAL_SLOTTED(simoptions,chrom,args{:});
+[legacy,legacySimOptions]=chrom2design_RADIAL_SLOTTED(simoptions,chrom,args{:});
 fields={'Ryi','Ryo','Rmi','Rmo','Rbi','Rbo','Rtsb','Rtsg','Rcm', ...
     'tc','tsb','tsg','g','tm','tbi','ty','thetacg','thetacy','thetasg', ...
     'RmiVRmo','RyiVRyo','tsgVtsb','thetamVthetap','thetacgVthetas', ...

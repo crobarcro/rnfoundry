@@ -69,8 +69,11 @@ end
 end
 
 function [design, simoptions] = resolve_conductor_and_branches(design, simoptions)
-if ~isfield(simoptions, 'MaxStrandDiameter'), simoptions.MaxStrandDiameter = inf; end
-if simoptions.MaxStrandDiameter < simoptions.MinStrandDiameter
+effectiveMaxStrandDiameter = inf;
+if isfield(simoptions, 'MaxStrandDiameter')
+    effectiveMaxStrandDiameter = simoptions.MaxStrandDiameter;
+end
+if effectiveMaxStrandDiameter < simoptions.MinStrandDiameter
     error('rnfoundry:em:InvalidStrandLimits', 'Maximum strand diameter is below minimum strand diameter.');
 end
 design.LgVLc = 0;
@@ -80,17 +83,21 @@ if design.WireStrandDiameter < simoptions.MinStrandDiameter
     design.WireStrandDiameter = simoptions.MinStrandDiameter;
     design.Dc = design.WireStrandDiameter*sqrt(design.NStrands);
 end
-if design.WireStrandDiameter > simoptions.MaxStrandDiameter
-    design.WireStrandDiameter = simoptions.MaxStrandDiameter;
+if design.WireStrandDiameter > effectiveMaxStrandDiameter
+    design.WireStrandDiameter = effectiveMaxStrandDiameter;
     area = pi*(design.Dc/2)^2;
-    fullDiameter = conductord2wired(design.WireStrandDiameter);
+    fullDiameter = rnfoundry.em.winding.insulatedWireDiameter( ...
+        design.WireStrandDiameter);
     strandArea = pi*(fullDiameter/2)^2;
+    strandCount = NaN;
     if strandArea > area
-        design.NStrands = 1;
+        strandCount = 1;
         design.WireStrandDiameter = 0.99*sqrt(4*area/pi);
-    else
-        design.NStrands = round(area/strandArea);
+    elseif strandArea < area
+        strandCount = round(area/strandArea);
     end
+    % Deliberately preserve CoilTurns' Ac == area NaN behavior.
+    design.NStrands = strandCount;
     design.Dc = design.WireStrandDiameter*sqrt(design.NStrands);
 end
 active = design.NCoilsPerPhase;
@@ -183,43 +190,10 @@ function design = repair_external (design, simoptions, options)
         design = updatedims_exteral_arm(design);
     end
     
-%     % check if the yoke thickness is too big relative to the magnet thickness
-%     if (design.ty / design.tm) > options.Max_tyVtm
-%         % move the stator yoke internal radius outwards to reduce the
-%         % thickness of the yoke
-%         rshift = design.ty - (design.tm * options.Max_tyVtm);
-%         design.Ryo = design.Ryo - rshift;
-%         
-%         design = updatedims_exteral_arm(design);
-%     end
-%     
-%     % check if the back iron thickness is too big relative to the magnet
-%     % thickness
-%     if (design.tbi / design.tm) > options.Max_tbiVtm
-%         % move the stator yoke internal radius inwards to reduce the
-%         % thickness of the yoke
-%         rshift = design.tbi - (design.tm * options.Max_tbiVtm);
-%         design.Rbi = design.Rbi + rshift;
-%         design = updatedims_exteral_arm(design);
-%     end
-%     
-%     % check if the magnet thickness is greater than the maximum allowed
-%     if design.tm > options.Max_tm
-%         rshift = design.tm - options.Max_tm;
-%         design.tm = options.Max_tm;
-%         design.Rmi = design.Rmi + rshift;
-%         design.Rbi = design.Rbi + rshift;
-%         design = updatedims_exteral_arm(design);
-%     end
 
     % check if the configuration of the shoe will cause too small triangles
     % to be created in the mesh
     if design.tsb > 0 && (design.tsg < design.tsb)
-        
-%         x = ((design.thetac(1) - design.thetasg)/2) * design.Rtsb;
-%         y = design.tsb - design.tsg;
-% 
-%         tsbangle = rad2deg(atan( y / x ));
 
         if design.tsg < 1e-5
             x = ((design.thetacg - design.thetasg)/2) * design.Rtsb;
@@ -383,27 +357,14 @@ function design = repair_internal (design, simoptions, options)
         design.RtsbVRao = design.Rtsb / design.Rao;
         design.RyoVRtsb = design.Ryo / design.Rtsb;
         design.RyiVRyo = design.Ryi / design.Ryo;
-%         design.tsgVtsb = design.tsg / design.tsb;
     end
 
-%         factors = factor2(design.NBasicWindings)';
-% 
-%         % now determine the number of modules to use
-%         modulecomp = design.ModuleFac * design.NBasicWindings;
-% 
-%         NearestFacStruct = ipdm(modulecomp, factors, ...
-%                                 'Subset', 'NearestNeighbor', ...
-%                                 'Result', 'Structure');
-% 
-%         design.NModules = factors(NearestFacStruct.columnindex, NearestFacStruct.rowindex);
 
     design = completedesign_RADIAL_SLOTTED(design, simoptions);
 
     % check for too big tooth shoe
     if (design.tsb > 0) && (design.tsb / design.tc(1)) > options.Max_tsbVtc1
         % shift the shoe base radial position outward
-%         rshift = (design.tsb - (design.tc(1)*options.Max_tsbVtc1));
-%         design.Rtsb = design.Rtsb + rshift;
         design.tsb = design.tc(1)*options.Max_tsbVtc1;
         design.Rtsb = design.Rao - design.tsb;
         % recalculate the shoe gap size
@@ -460,43 +421,10 @@ function design = repair_internal (design, simoptions, options)
         design = updatedims_interal_arm(design);
     end
     
-%     % check if the yoke thickness is too big relative to the magnet thickness
-%     if (design.ty / design.tm) > options.Max_tyVtm
-%         % move the stator yoke internal radius outwards to reduce the
-%         % thickness of the yoke
-%         rshift = design.ty - (design.tm * options.Max_tyVtm);
-%         design.Ryo = design.Ryo - rshift;
-%         
-%         design = updatedims_exteral_arm(design);
-%     end
-%     
-%     % check if the back iron thickness is too big relative to the magnet
-%     % thickness
-%     if (design.tbi / design.tm) > options.Max_tbiVtm
-%         % move the stator yoke internal radius inwards to reduce the
-%         % thickness of the yoke
-%         rshift = design.tbi - (design.tm * options.Max_tbiVtm);
-%         design.Rbi = design.Rbi + rshift;
-%         design = updatedims_exteral_arm(design);
-%     end
-%     
-%     % check if the magnet thickness is greater than the maximum allowed
-%     if design.tm > options.Max_tm
-%         rshift = design.tm - options.Max_tm;
-%         design.tm = options.Max_tm;
-%         design.Rmi = design.Rmi + rshift;
-%         design.Rbi = design.Rbi + rshift;
-%         design = updatedims_exteral_arm(design);
-%     end
 
     % check if the configuration of the shoe will cause too small triangles
     % to be created in the mesh
     if design.tsb > 0 && (design.tsg < design.tsb)
-        
-%         x = ((design.thetac(1) - design.thetasg)/2) * design.Rtsb;
-%         y = design.tsb - design.tsg;
-% 
-%         tsbangle = rad2deg(atan( y / x ));
 
         if design.tsg < 1e-5
             x = ((design.thetacg - design.thetasg)/2) * design.Rtsb;
