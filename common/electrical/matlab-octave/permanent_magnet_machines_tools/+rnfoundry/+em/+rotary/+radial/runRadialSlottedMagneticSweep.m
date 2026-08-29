@@ -6,13 +6,7 @@ function result = runRadialSlottedMagneticSweep(machine, options)
 %   not public options.
 
 if nargin < 2, options = struct(); end
-if ~isa(machine,'rnfoundry.em.rotary.radial.SlottedPMMachine')
-    error('rnfoundry:em:InvalidSweepMachine','machine must be a SlottedPMMachine.');
-end
-options = validateOptions(options,machine);
-
-design = machine.toLegacyStruct();
-design.FirstSlotCenter = 0;
+[design,options]=rnfoundry.em.rotary.radial.prepareMagneticSweep(machine,options);
 positions = linspace(0,1,options.NPositions);
 angles = machine.thetap .* positions;
 npolePairs = max(1,ceil(design.pb/2));
@@ -30,9 +24,7 @@ meshMap = {'MagnetRegionMeshSize','MagnetRegionMeshSize'; ...
     'CoilRegionMeshSize','CoilRegionMeshSize'; ...
     'ShoeGapRegionMeshSize','ShoeGapRegionMeshSize'};
 for k = 1:size(meshMap,1)
-    if isfield(options,meshMap{k,1})
-        args(end+1:end+2) = {meshMap{k,2},options.(meshMap{k,1})}; %#ok<AGROW>
-    end
+    args(end+1:end+2) = {meshMap{k,2},options.(meshMap{k,1})}; %#ok<AGROW>
 end
 [problem,rotorInfo,statorInfo] = slottedfemmprob_radial(design,args{:});
 analysis = rnfoundry.em.fea.XFemmSessionAnalysis(problem);
@@ -47,8 +39,11 @@ coilArea = NaN; ironArea = NaN; radialForce = NaN;
 for posind = 1:n
     % Apply at the first position too: this makes the positioner the single
     % authority for AGE state and preserves the legacy zero-angle first solve.
-    positioner.apply(analysis,angles(posind));
-    analysis.setCircuitCurrents(options.PhaseCurrents);
+    positioner.apply(analysis.Session,angles(posind));
+    for circuitInd=1:numel(problem.Circuits)
+        analysis.Session.setCircuit(problem.Circuits(circuitInd).Name, ...
+            'current',options.PhaseCurrents(circuitInd));
+    end
     analysis.solve();
     session = analysis.Session;
     session.smoothon();
@@ -107,41 +102,6 @@ s = struct('Positions',positions(:),'CoggingTorque',torque, ...
         'NPolePairs',npolePairs,'AGEBoundaryNames',{problem.AGEBoundNames}, ...
         'NPositions',n,'PhaseCurrents',options.PhaseCurrents));
 result = rnfoundry.em.fea.MagneticSweepResult(s);
-end
-
-function options = validateOptions(options,machine)
-if ~isstruct(options) || ~isscalar(options)
-    error('rnfoundry:em:InvalidSweepOptions','options must be a scalar structure.');
-end
-allowed = {'NPositions','PhaseCurrents','MagnetRegionMeshSize', ...
-    'BackIronRegionMeshSize','AirGapMeshSize','OuterRegionsMeshSize', ...
-    'YokeRegionMeshSize','CoilRegionMeshSize','ShoeGapRegionMeshSize'};
-names = fieldnames(options);
-for k=1:numel(names)
-    if ~any(strcmp(names{k},allowed))
-        error('rnfoundry:em:UnknownSweepOption','Unknown sweep option: %s',names{k});
-    end
-end
-if ~isfield(options,'NPositions'), options.NPositions=10; end
-if ~isfield(options,'PhaseCurrents')
-    options.PhaseCurrents=zeros(machine.Armature.Winding.PhaseCount,1);
-end
-if ~(isscalar(options.NPositions) && isfinite(options.NPositions) && ...
-        options.NPositions == fix(options.NPositions) && options.NPositions >= 2)
-    error('rnfoundry:em:InvalidSweepOptions','NPositions must be an integer of at least two.');
-end
-if ~isnumeric(options.PhaseCurrents) || ...
-        numel(options.PhaseCurrents) ~= machine.Armature.Winding.PhaseCount || ...
-        any(~isfinite(options.PhaseCurrents(:)))
-    error('rnfoundry:em:InvalidSweepOptions','PhaseCurrents must contain one finite value per phase.');
-end
-options.PhaseCurrents=options.PhaseCurrents(:);
-for k=3:numel(allowed)
-    name=allowed{k};
-    if isfield(options,name) && ~(isscalar(options.(name)) && isfinite(options.(name)))
-        error('rnfoundry:em:InvalidSweepOptions','%s must be a finite scalar.',name);
-    end
-end
 end
 
 function [x,y] = toothSamplePoints(design,n)

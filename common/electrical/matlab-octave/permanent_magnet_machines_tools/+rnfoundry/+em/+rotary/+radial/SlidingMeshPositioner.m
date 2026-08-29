@@ -24,10 +24,10 @@ classdef SlidingMeshPositioner
                 innerAngle = 0; outerAngle = degrees;
             end
         end
-        function apply(obj, analysis, position)
+        function apply(obj, session, position)
             [innerAngle,outerAngle] = obj.angles(position);
             for k = 1:numel(obj.BoundaryNames)
-                analysis.setBoundaryPosition(obj.BoundaryNames{k},innerAngle,outerAngle);
+                session.setAGEPosition(obj.BoundaryNames{k},innerAngle,outerAngle);
             end
         end
     end

@@ -1,8 +1,24 @@
 name: MATLAB and Octave unit tests
 
 on:
-  push:
   pull_request:
+    branches: [main]
+    paths:
+      - common/electrical/matlab-octave/permanent_magnet_machines_tools/**
+      - .github/workflows/matlab-octave-unit-tests.yml
+  push:
+    branches: [main]
+    paths:
+      - common/electrical/matlab-octave/permanent_magnet_machines_tools/**
+      - .github/workflows/matlab-octave-unit-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electrical-machines-unit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # MOxUnit upstream master as reviewed on 2026-08-29; intentionally immutable.
@@ -13,18 +29,20 @@ jobs:
   octave:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check out pinned MOxUnit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: MOxUnit/MOxUnit
-          ref: 39de87844cccf33c79283c881e221a97207a9b83
+          ref: ${{ env.MOXUNIT_COMMIT }}
           path: .ci-tools/MOxUnit
-      - name: Install GNU Octave
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y octave
+      - name: Confirm GNU Octave container version
+        run: docker run --rm --entrypoint octave ghcr.io/gnu-octave/octave:11.3.0 --version
       - name: Run shared MOxUnit tests
         run: >-
-          octave --no-gui --quiet --eval
+          docker run --rm --entrypoint octave
+          -v "$GITHUB_WORKSPACE:/workspace" -w /workspace
+          ghcr.io/gnu-octave/octave:11.3.0 --no-gui --quiet --eval
           "addpath(fullfile(pwd,'$TOOLBOX_ROOT','ci'));
           run_unit_tests(fullfile(pwd,'.ci-tools','MOxUnit'),fullfile(pwd,'test-results','octave.xml'));"
       - name: Upload JUnit report
@@ -37,17 +55,19 @@ jobs:
   matlab:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check out pinned MOxUnit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: MOxUnit/MOxUnit
-          ref: 39de87844cccf33c79283c881e221a97207a9b83
+          ref: ${{ env.MOXUNIT_COMMIT }}
           path: .ci-tools/MOxUnit
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: R2026a
       - name: Run the same shared MOxUnit tests
-        uses: matlab-actions/run-command@v2
+        uses: matlab-actions/run-command@v3
         with:
           command: >-
             addpath(fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','ci'));

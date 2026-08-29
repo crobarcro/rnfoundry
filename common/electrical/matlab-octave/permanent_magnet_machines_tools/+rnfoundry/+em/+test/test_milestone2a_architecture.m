@@ -9,6 +9,7 @@ for k=1:numel(forbidden)
     assert(isempty(strfind(sweep,forbidden{k})), ...
         'rnfoundry:em:ForbiddenSolverPath','New sweep contains forbidden legacy path %s.',forbidden{k});
 end
-assert(isempty(strfind(owner,'setAGEPosition(')) == false); % generic delegate only
+assert(isempty(strfind(owner,'setAGEPosition')));
+assert(isempty(strfind(owner,'setCircuit')) && isempty(strfind(owner,'num2str')));
 assert(isempty(strfind(owner,'Armature')) && isempty(strfind(owner,'SlidingMesh')));
 end

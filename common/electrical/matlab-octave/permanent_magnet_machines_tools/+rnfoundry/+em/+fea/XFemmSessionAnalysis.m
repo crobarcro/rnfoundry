@@ -1,8 +1,7 @@
 classdef XFemmSessionAnalysis < handle
     %XFEMMSESSIONANALYSIS Own one xfemm session and its input FEM file.
     %   This class deliberately contains no machine-topology or positioning
-    %   policy.  A topology-specific positioner may operate on it by using
-    %   setBoundaryPosition.
+    %   policy. Topology-specific code operates on the owned Session.
     properties (SetAccess = private)
         FemmProblem
         FemFileName
@@ -25,16 +24,6 @@ classdef XFemmSessionAnalysis < handle
             catch err
                 obj.cleanupFile();
                 rethrow(err);
-            end
-        end
-        function setBoundaryPosition(obj, name, innerAngle, outerAngle)
-            obj.requireSession();
-            obj.Session.setAGEPosition(name, innerAngle, outerAngle);
-        end
-        function setCircuitCurrents(obj, currents)
-            obj.requireSession();
-            for k = 1:numel(currents)
-                obj.Session.setCircuit(num2str(k), 'current', currents(k));
             end
         end
         function solve(obj)

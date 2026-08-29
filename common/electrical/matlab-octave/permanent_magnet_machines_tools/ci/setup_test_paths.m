@@ -17,5 +17,6 @@ addpath(fullfile(moxunitRoot,'MOxUnit'));
 moxunit_set_path();
 addpath(genpath(toolboxRoot));
 paths=struct('RepositoryRoot',repoRoot,'ToolboxRoot',toolboxRoot, ...
-    'TestRoot',fullfile(toolboxRoot,'tests'),'MOxUnitRoot',moxunitRoot);
+    'UnitTestRoot',fullfile(toolboxRoot,'tests','unit'), ...
+    'FEATestRoot',fullfile(toolboxRoot,'tests','fea'),'MOxUnitRoot',moxunitRoot);
 end
