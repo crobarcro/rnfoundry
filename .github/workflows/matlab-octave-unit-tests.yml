@@ -1,0 +1,60 @@
+name: MATLAB and Octave unit tests
+
+on:
+  push:
+  pull_request:
+
+env:
+  # MOxUnit upstream master as reviewed on 2026-08-29; intentionally immutable.
+  MOXUNIT_COMMIT: 39de87844cccf33c79283c881e221a97207a9b83
+  TOOLBOX_ROOT: common/electrical/matlab-octave/permanent_magnet_machines_tools
+
+jobs:
+  octave:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out pinned MOxUnit
+        uses: actions/checkout@v4
+        with:
+          repository: MOxUnit/MOxUnit
+          ref: 39de87844cccf33c79283c881e221a97207a9b83
+          path: .ci-tools/MOxUnit
+      - name: Install GNU Octave
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y octave
+      - name: Run shared MOxUnit tests
+        run: >-
+          octave --no-gui --quiet --eval
+          "addpath(fullfile(pwd,'$TOOLBOX_ROOT','ci'));
+          run_unit_tests(fullfile(pwd,'.ci-tools','MOxUnit'),fullfile(pwd,'test-results','octave.xml'));"
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: octave-unit-test-results
+          path: test-results/octave.xml
+
+  matlab:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out pinned MOxUnit
+        uses: actions/checkout@v4
+        with:
+          repository: MOxUnit/MOxUnit
+          ref: 39de87844cccf33c79283c881e221a97207a9b83
+          path: .ci-tools/MOxUnit
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+      - name: Run the same shared MOxUnit tests
+        uses: matlab-actions/run-command@v2
+        with:
+          command: >-
+            addpath(fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','ci'));
+            run_unit_tests(fullfile(pwd,'.ci-tools','MOxUnit'),fullfile(pwd,'test-results','matlab.xml'));
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matlab-unit-test-results
+          path: test-results/matlab.xml
