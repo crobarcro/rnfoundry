@@ -1,11 +1,17 @@
-function [machine,result]=makePreparedMagneticFixture(layerCount,skew)
+function [machine,result]=makePreparedMagneticFixture(layerCount,skew,duplicatePositions)
 %MAKEPREPAREDMAGNETICFIXTURE Representative deterministic raw 2A data.
 machine=makeExternalSlottedMachine();
 if nargin < 1, layerCount=2; end
 if nargin < 2, skew=machine.Field.MagnetSkew; end
+if nargin < 3, duplicatePositions=false; end
 machine=setFixtureWinding(machine,layerCount,skew);
 p=linspace(0,1,9).';
-slotBase=[-1,-0.57,-0.13,0.31,0.76,1.23];
+if duplicatePositions
+    % Sweep increments and half-pole slot spacing create exact duplicates.
+    slotBase=[-1,-0.5,0,0.5,1,1.5];
+else
+    slotBase=[-1,-0.57,-0.13,0.31,0.76,1.23];
+end
 slotPosition=bsxfun(@plus,p,slotBase);
 n=numel(p); ns=numel(slotBase);
 slotIntegral=zeros(n,ns,layerCount,1);

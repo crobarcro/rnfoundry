@@ -87,8 +87,11 @@ function y = periodicslmeval(x, slm, evalmode, checkinputs)
 
 % Created by Richard Crozier 2012-2015
 
-    if nargin < 3
+    if nargin < 3 || isempty(evalmode)
         evalmode = 0;
+    end
+    if nargin < 4 || isempty(checkinputs)
+        checkinputs = true;
     end
     
     xmod = slm.x(1)+mod(x-slm.x(1), slm.period);

@@ -1,11 +1,13 @@
-function prepared=prepareRadialSlottedMagneticModel(machine,sweepResult)
+function prepared=prepareRadialSlottedMagneticModel(machine,sweepResult,options)
 %PREPARERADIALSLOTTEDMAGNETICMODEL Fit an existing raw zero-current sweep.
 %   This deterministic service performs no FEA.  Positions are normalized
-%   in pole spans and both returned public models have period two.
+%   in pole spans and both returned public models have period two. OPTIONS
+%   may contain NSkewPositions, a positive integer with default value 10.
 
 validateInputs(machine,sweepResult);
+if nargin < 3, options=struct(); end
+nSkewPositions=resolveOptions(options);
 w=machine.Armature.Winding;
-nSkewPositions=10; % Legacy simfun_AM default; deliberately not a public fitting option.
 
 [slotPosition,slotIntegral]=flattenSlotA(sweepResult.SlotVectorPotential);
 [slotPosition,order]=sort(slotPosition);
@@ -67,6 +69,27 @@ coggingFit=slmengine(coggingPosition,coggingTorque,'EndCon','periodic', ...
 coggingModel=rnfoundry.em.CoggingTorqueModel(coggingFit,slmpar(coggingFit,'maxfun'));
 prepared=rnfoundry.em.PreparedMachineModel(machine, ...
     rnfoundry.em.PreparedMagneticModel(fluxModel,coggingModel));
+end
+
+function nSkewPositions=resolveOptions(options)
+if ~isstruct(options) || ~isscalar(options)
+    error('rnfoundry:em:InvalidMagneticPreparationOptions', ...
+        'Magnetic preparation options must be a scalar structure.');
+end
+names=fieldnames(options);
+if any(~strcmp(names,'NSkewPositions'))
+    error('rnfoundry:em:InvalidMagneticPreparationOptions', ...
+        'Only NSkewPositions is supported by magnetic preparation.');
+end
+if isfield(options,'NSkewPositions'), nSkewPositions=options.NSkewPositions;
+else, nSkewPositions=10;
+end
+if ~isnumeric(nSkewPositions) || ~isscalar(nSkewPositions) ...
+        || ~isfinite(nSkewPositions) || nSkewPositions<1 ...
+        || nSkewPositions~=fix(nSkewPositions)
+    error('rnfoundry:em:InvalidMagneticPreparationOptions', ...
+        'NSkewPositions must be a finite positive integer scalar.');
+end
 end
 
 function validateInputs(machine,result)

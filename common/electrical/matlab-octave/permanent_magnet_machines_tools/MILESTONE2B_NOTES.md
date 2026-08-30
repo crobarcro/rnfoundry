@@ -1,6 +1,6 @@
 # Milestone 2B implementation notes
 
-`prepareRadialSlottedMagneticModel(machine, rawSweep)` is the pure boundary
+`prepareRadialSlottedMagneticModel(machine, rawSweep, options)` is the pure boundary
 from a canonical radial-slotted machine and an already completed
 `MagneticSweepResult` to a `PreparedMachineModel`. It performs no drawing,
 solving, session creation, or further FEA, and neither input is mutated.
@@ -18,7 +18,9 @@ The SLM kernels (`slmengine`, `slmeval`, `periodicslmeval`, `slmpar`) and
 `fluxlinkagefrmintAslm` remain the numerical backend. Public evaluation uses
 normalized position measured in pole spans and has period two. Flux skew uses
 the legacy `simfun_AM` default of ten sections over the canonical
-`Field.MagnetSkew` extent. Cogging preparation retains the legacy two-stage
+`Field.MagnetSkew` extent. The optional numerical preparation setting
+`options.NSkewPositions` selects the section count and defaults to 10; it is
+not canonical field state. Cogging preparation retains the legacy two-stage
 fit, stack-length normalization/rescaling, and the same ten-section skew
 average across `[-skew/2,+skew/2]`.
 
