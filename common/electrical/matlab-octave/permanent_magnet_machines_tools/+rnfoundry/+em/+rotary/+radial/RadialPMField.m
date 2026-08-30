@@ -10,6 +10,7 @@ classdef RadialPMField
         Rbo
         thetam
         MagnetSkew
+        MagnetPolarisation
         MagnetMaterial
         BackIronMaterial
     end
@@ -21,8 +22,11 @@ classdef RadialPMField
     end
     methods
         function obj = RadialPMField(s)
+            if ~isfield(s,'MagnetPolarisation')
+                s.MagnetPolarisation='constant';
+            end
             names = {'Rmi','Rmo','Rbi','Rbo','thetam','MagnetSkew', ...
-                     'MagnetMaterial','BackIronMaterial'};
+                     'MagnetPolarisation','MagnetMaterial','BackIronMaterial'};
             for k = 1:numel(names)
                 if ~isfield(s,names{k})
                     error('rnfoundry:em:MissingFieldProperty','Missing field property %s.',names{k});
@@ -66,12 +70,19 @@ classdef RadialPMField
                     && obj.MagnetSkew >= 0 && obj.MagnetSkew <= 1)
                 error('rnfoundry:em:InvalidMagnetSkew','MagnetSkew must be in [0, 1].');
             end
+            if ~ischar(obj.MagnetPolarisation) ...
+                    || ~any(strcmpi(obj.MagnetPolarisation,{'constant','radial'}))
+                error('rnfoundry:em:InvalidMagnetPolarisation', ...
+                    'MagnetPolarisation must be constant or radial.');
+            end
         end
         function s = toStruct(obj)
             s = struct('Schema','rnfoundry.em.rotary.radial.RadialPMField', ...
                 'SchemaVersion',1,'Type','RadialPMField','Rmi',obj.Rmi,'Rmo',obj.Rmo, ...
                 'Rbi',obj.Rbi,'Rbo',obj.Rbo,'thetam',obj.thetam, ...
-                'MagnetSkew',obj.MagnetSkew,'MagnetMaterial',obj.MagnetMaterial, ...
+                'MagnetSkew',obj.MagnetSkew, ...
+                'MagnetPolarisation',obj.MagnetPolarisation, ...
+                'MagnetMaterial',obj.MagnetMaterial, ...
                 'BackIronMaterial',obj.BackIronMaterial);
         end
     end
