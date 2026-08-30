@@ -93,6 +93,10 @@ function y = periodicslmeval(x, slm, evalmode, checkinputs)
     
     xmod = slm.x(1)+mod(x-slm.x(1), slm.period);
 
-    y = mexslmeval (xmod, slm.knots, slm.coef, evalmode);
+    % slmeval selects the compiled evaluator when it is available and its
+    % numerically equivalent m-file implementation otherwise.  Calling the
+    % MEX entry point directly made periodic SLMs unusable in clean Octave
+    % and MATLAB installations where the optional binary was not built.
+    y = slmeval (xmod, slm, evalmode, checkinputs);
     
 end
