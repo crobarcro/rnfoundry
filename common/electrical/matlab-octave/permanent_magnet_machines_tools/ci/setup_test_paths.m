@@ -16,6 +16,9 @@ end
 addpath(fullfile(moxunitRoot,'MOxUnit'));
 moxunit_set_path();
 addpath(genpath(toolboxRoot));
+addpath(fullfile(repoRoot,'common','matlab-octave','misc'));
+addpath(fullfile(repoRoot,'common','matlab-octave','curve_fitting_and_evaluation', ...
+    'tb-shape_language_modelling'));
 paths=struct('RepositoryRoot',repoRoot,'ToolboxRoot',toolboxRoot, ...
     'UnitTestRoot',fullfile(toolboxRoot,'tests','unit'), ...
     'FEATestRoot',fullfile(toolboxRoot,'tests','fea'),'MOxUnitRoot',moxunitRoot);

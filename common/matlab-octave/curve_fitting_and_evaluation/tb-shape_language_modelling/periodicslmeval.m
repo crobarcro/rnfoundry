@@ -87,12 +87,19 @@ function y = periodicslmeval(x, slm, evalmode, checkinputs)
 
 % Created by Richard Crozier 2012-2015
 
-    if nargin < 3
+    if nargin < 3 || isempty(evalmode)
         evalmode = 0;
+    end
+    if nargin < 4 || isempty(checkinputs)
+        checkinputs = true;
     end
     
     xmod = slm.x(1)+mod(x-slm.x(1), slm.period);
 
-    y = mexslmeval (xmod, slm.knots, slm.coef, evalmode);
+    % slmeval selects the compiled evaluator when it is available and its
+    % numerically equivalent m-file implementation otherwise.  Calling the
+    % MEX entry point directly made periodic SLMs unusable in clean Octave
+    % and MATLAB installations where the optional binary was not built.
+    y = slmeval (xmod, slm, evalmode, checkinputs);
     
 end
