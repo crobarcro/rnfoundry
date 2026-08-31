@@ -23,12 +23,36 @@ assert(isfinite(model.evaluate(machine.g))); % legacy permits extrapolation
 rnfoundry.em.test.assertError(@() model.evaluate(NaN),'rnfoundry:em:InvalidRadialDisplacement');
 assert(isequal(machine.toStruct(),before)); assert(isequal(raw.ClosingForce,rawBefore));
 
+% Freeze finfun_AM's order rule after simfun's artificial origin is added.
+fitCases={.5.*machine.g,5,1; ...
+          [.25;.75].*machine.g,[2;11],2; ...
+          [0;.45;.9;.95].*machine.g,[4;8;19;27],2};
+dense=linspace(-.1.*machine.g,1.1.*machine.g,101);
+for caseInd=1:size(fitCases,1)
+    caseRaw=rnfoundry.em.fea.RadialGapForceSweepResult( ...
+        fitCases{caseInd,1},fitCases{caseInd,2},p);
+    caseModel=rnfoundry.em.rotary.radial.prepareRadialSlottedGapForceModel(machine,caseRaw);
+    expectedOrder=fitCases{caseInd,3};
+    caseOracle=polyfitn([0;caseRaw.Displacements], ...
+        [0;caseRaw.ClosingForce],expectedOrder);
+    assert(max(caseModel.Polynomial.ModelTerms(:))==expectedOrder);
+    assert(isequal(caseModel.Polynomial.ModelTerms,caseOracle.ModelTerms));
+    oracleValues=reshape(polyvaln(caseOracle,dense(:)),size(dense));
+    assert(max(abs(caseModel.evaluate(dense)-oracleValues))<1e-10);
+end
+
 prepared=rnfoundry.em.rotary.radial.prepareRadialSlottedMagneticModel(machine,magRaw);
 assert(isempty(prepared.GapForce)); magnetic=prepared.Magnetic;
+sectionsBefore={prepared.Machine,prepared.Magnetic,prepared.Circuit, ...
+    prepared.Losses,prepared.MassProperties,prepared.Diagnostics};
 combined=prepared.withGapForce(model);
 assert(isa(combined.GapForce,'rnfoundry.em.RadialGapForceModel'));
-assert(isequal(combined.Magnetic,magnetic)); assert(isempty(combined.Circuit));
-assert(isempty(combined.Losses)); assert(isempty(combined.MassProperties));
+assert(isempty(prepared.GapForce)); assert(isequal(combined.Magnetic,magnetic));
+sectionsAfter={combined.Machine,combined.Magnetic,combined.Circuit, ...
+    combined.Losses,combined.MassProperties,combined.Diagnostics};
+assert(isequal(sectionsAfter,sectionsBefore));
+rnfoundry.em.test.assertError(@() prepared.withGapForce(3), ...
+    'rnfoundry:em:InvalidPreparedMachineModel');
 
 o=rnfoundry.em.rotary.radial.resolveGapForceSweepOptions(machine,struct());
 assert(numel(o.Displacements)==4); assert(o.Displacements(1)==0);

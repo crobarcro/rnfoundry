@@ -55,7 +55,8 @@ the optional explicit `Displacements` vector, otherwise uses the legacy grid.
 It rebuilds a full problem and owns a fresh `XFemmSessionAnalysis` per sample.
 
 `prepareRadialSlottedGapForceModel` is pure, prepends the legacy artificial
-origin and performs the exact quadratic `polyfitn`. `RadialGapForceModel`
+origin and applies the exact `finfun_AM` order rule: linear for at most two
+augmented samples and quadratic for more than two. `RadialGapForceModel`
 stores that polynomial and the sampled domain; `evaluate` accepts finite real
 scalar or array metres, preserves shape, returns full-machine newtons, and
 intentionally extrapolates through `polyvaln`. `PreparedMachineModel` retains

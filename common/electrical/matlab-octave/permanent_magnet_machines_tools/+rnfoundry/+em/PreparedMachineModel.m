@@ -25,7 +25,11 @@ classdef PreparedMachineModel
             obj.MassProperties=[]; obj.Diagnostics=[];
         end
         function result = withGapForce(obj,gapForce)
-            result = rnfoundry.em.PreparedMachineModel(obj.Machine,obj.Magnetic,gapForce);
+            if ~isempty(gapForce) && ~isa(gapForce,'rnfoundry.em.RadialGapForceModel')
+                error('rnfoundry:em:InvalidPreparedMachineModel','GapForce has an invalid type.');
+            end
+            result = obj;
+            result.GapForce = gapForce;
         end
     end
 end
