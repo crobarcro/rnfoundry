@@ -938,7 +938,7 @@ Therefore:
 
 - reserve an architectural extension point;
 - do not claim proximity-loss parity;
-- do not include proximity-loss implementation in Milestone 1A or 1B;
+- do not include proximity-loss implementation in Milestone 1A, 1B, or 2;
 - do not create tests that imply it currently works.
 
 ---
@@ -1369,7 +1369,7 @@ Legacy `intAdata` and `intBdata` belong here, not on the physical machine.
 
 ### 16.1 Gap force
 
-Represent prepared gap-force data as an explicit model, for example:
+Represent the prepared **variable-gap/eccentric closing-force curve** as an explicit model, for example:
 
 ```matlab
 PreparedMachineModel.GapForce
@@ -1381,17 +1381,17 @@ with an API such as:
 evaluate(radialDisplacement)
 ```
 
-This replaces the legacy mixture of fields such as:
+This replaces the variable-gap legacy fields:
 
 ```text
 ForceGapClosingWithDisp
 DispGapClosingForce
 p_ForceGapClosingWithDisp
-PerPoleAirGapClosingForce
-ForcePerAreaToothSurface
 ```
 
-while preserving the underlying calculations.
+while preserving their underlying calculations and extrapolation semantics.
+
+Do not conflate this curve with the nominal force observation from the main magnetic sweep. Legacy `PerPoleAirGapClosingForce` corresponds to the nominal per-pole radial force at the reference magnetic position and should remain a distinct prepared observation/diagnostic. `ForcePerAreaToothSurface` is derived from that nominal force and tooth-facing area; it is not derived from the variable-gap polynomial.
 
 ### 16.2 Mass properties
 
@@ -1568,7 +1568,7 @@ Long-term parity should be checked in stages:
 4. dynamic simulation;
 5. evaluation/optimisation.
 
-Milestone 1A covers only the first level plus winding/conductor numerical kernels.
+Milestone 1A covers only the first level plus winding/conductor numerical kernels. Milestone 2 is responsible for levels 2 and 3 for the radial-slotted offline-preparation path.
 
 ### 21.4 Numeric comparison
 
@@ -1735,37 +1735,523 @@ Stop for review after Milestone 1B.
 
 ---
 
-## Milestone 2 — femmsession-only radial magnetic preparation
+## Milestone 2 — complete offline preparation of the radial-slotted machine
 
 ### Objective
 
-Migrate the radial-slotted magnetic preparation path using only `xfemm.femmsession`.
+Starting from a valid canonical `SlottedPMMachine`, produce a value-semantic `PreparedMachineModel` containing the machine-intrinsic numerical models and prepared physical properties required by later dynamic simulation and evaluation.
 
-### Initial deliverables
+New FEA work in this milestone must use `xfemm.femmsession` exclusively. The canonical `Machine` remains solver-free and must not be mutated during preparation.
 
-- `XFemmSessionAnalysis < handle`;
-- composed topology position updater;
+Milestone 2 ends at the **offline prepared-model boundary**. It does not migrate dynamic ODE simulation, external electrical loads, converter/controller configuration, optimisation scoring, or structural evaluation.
+
+The intended high-level division is therefore:
+
+```text
+Milestone 1: construct a valid physical machine
+Milestone 2: prepare that machine numerically
+Milestone 3: simulate the prepared machine dynamically
+```
+
+### 22.2.1 Common preparation pattern
+
+Where a preparation step uses FEA, preserve the separation:
+
+```text
+canonical Machine
+       ↓
+FEA characterization
+       ↓
+raw result value object
+       ↓
+pure preparation / fitting
+       ↓
+prepared domain model
+       ↓
+PreparedMachineModel section
+```
+
+Raw observations must remain separately inspectable. Do not hide the only copy of FEA observations inside fitted SLMs or other opaque prepared models.
+
+Where no FEA is required, keep the preparation stage as a deterministic pure calculation from canonical machine state and/or existing raw observations.
+
+### 22.2.2 Status of work already completed
+
+The work completed before this consolidation should be treated as the first Milestone-2 sub-stages:
+
+#### Milestone 2A — raw main magnetic characterization — complete
+
+Delivered:
+
+- `XFemmSessionAnalysis < handle` as the generic femmsession resource owner;
+- composed position-update policy;
 - `SlidingMeshPositioner` for radial machines;
-- femmsession-only main magnetic sweep;
-- raw `MagneticSweepResult`;
-- flux-linkage/cogging wrappers;
-- `PreparedMachineModel` magnetic boundary;
-- raw FEA parity tests.
+- femmsession-only radial-slotted main magnetic sweep;
+- reusable session across angular positions;
+- raw value-semantic `MagneticSweepResult`;
+- raw observations including cogging torque, direct flux linkage, slot vector-potential integrals, slot-flux integrals, tooth flux density, air-gap field, armature-iron area, FEA coil-area measurement, and nominal per-pole radial force;
+- architecture/unit tests and opt-in real-FEA parity infrastructure.
 
-### Constraints
+The main sweep is the authoritative modern source of reusable zero-current magnetic observations. Subsequent prepared-model stages should reuse its raw data rather than repeat equivalent solves unnecessarily.
 
-- do not migrate old `fmesher`/`fsolver`/`fpproc`/`analyse_mfemm` path;
-- do not hard-wire sliding mesh into the generic session wrapper;
-- one session per worker for future parallel execution;
-- public user options should not expose low-level solver mechanics unnecessarily.
+#### Milestone 2B — prepared magnetic models — complete
 
-Later Milestone 2 sub-stages can migrate:
+Delivered:
 
-- gap-force characterization;
-- inductance characterization;
-- core-loss preparation;
-- external-field winding eddy-current loss fit;
-- mass properties requiring FEA geometry.
+- pure raw-to-prepared magnetic conversion with no FEA;
+- `FluxLinkageModel`;
+- `CoggingTorqueModel`;
+- `PreparedMagneticModel`;
+- initial `PreparedMachineModel` boundary;
+- legacy-compatible `intA` / vector-potential flux-linkage path;
+- legacy skew, peak-position, lookup-grid and fitted-SLM semantics;
+- prepared-model parity and architecture tests.
+
+The direct circuit flux-linkage observation remains raw diagnostic/provenance data; it does not replace the legacy `intA`-derived prepared flux-linkage path unless a later separately justified change is made.
+
+#### Milestone 2C — variable-gap closing-force characterization — implemented
+
+Delivered by the Milestone-2C work, including PR #7 at the time of this plan consolidation:
+
+- raw `RadialGapForceSweepResult`;
+- femmsession-only full-machine eccentric displacement sweep;
+- negative-global-x field-assembly translation matching legacy semantics;
+- absolute global-x force block integral 18;
+- explicit full-machine force scaling;
+- `RadialGapForceModel`;
+- pure legacy-compatible fit preparation, including the artificial origin and legacy linear/quadratic order rule;
+- `PreparedMachineModel.GapForce` composition;
+- dependency-free tests and opt-in internal/external real-FEA parity coverage.
+
+The nominal `MagneticSweepResult.PerPoleRadialForce` is deliberately distinct from the variable-gap full-machine force curve.
+
+### 22.2.3 Cross-cutting Milestone-2 closure prerequisite — exact coil-region geometry / Issue #5
+
+Issue #5, **“Derive exact radial-slotted coil pack area from slot geometry without FEA”**, is a Milestone-2 completion blocker even though it is not another electromagnetic FEA characterization sub-stage.
+
+The required final construction order is:
+
+```text
+candidate
+   ↓
+repair
+   ↓
+exact slot / coil-region geometry
+   ↓
+exact PackArea
+   ↓
+canonical SlottedPMMachine
+   ↓
+FEA / preparation
+```
+
+The current transitional path still uses the first magnetic FEA solve's block-area measurement to obtain the legacy `CoilArea` used by prepared flux-linkage calculations. That measurement is valuable as a regression oracle, but the modern architecture must not require an FEA solve to complete canonical winding geometry.
+
+The Issue-#5 work must:
+
+- characterize the exact legacy meaning of `CoilArea` for single layer, ordinary double layer, and `SplitSlot` / `yd = 1` cases;
+- handle internal and external armatures;
+- preserve the full tapered/two-section `tc/tcb` slot geometry;
+- distinguish slot void, insulation region, per-layer pack regions and the canonical `PackArea` concept;
+- reuse or extract the authoritative slot-region geometry rather than create an unrelated approximation;
+- calculate the relevant region areas in MATLAB/Octave without a magnetic solve;
+- compare each applicable pure-geometry region area with FEMM block-integral area as a Tier-2 regression oracle;
+- remove the architectural dependency of prepared flux linkage on FEA-derived `CoilArea` once canonical area parity is demonstrated.
+
+After this work, `MagneticSweepResult.CoilArea` may remain as a raw FEA diagnostic/regression observation, but it must no longer be needed to make the physical machine definition complete.
+
+### 22.2.4 Milestone 2D — inductance characterization and intrinsic circuit preparation
+
+#### Objective
+
+Migrate the remaining radial-slotted inductance FEA and construct the machine-intrinsic prepared circuit model without importing external load/controller concerns from legacy `circuitprops_AM`.
+
+#### Raw FEA characterization
+
+Use `xfemm.femmsession` only to reproduce the currently active legacy d-axis and q-axis inductance solves.
+
+Introduce a raw value object such as:
+
+```text
+rnfoundry.em.fea.RadialSlottedInductanceResult
+    ExcitationCurrent
+    DAxis
+        Position
+        SelfInductance
+        MutualInductance
+    QAxis
+        Position
+        SelfInductance
+        MutualInductance
+    Provenance
+```
+
+Exact names may vary, but the result must retain:
+
+- excitation current used for characterization;
+- the legacy d/q characterization positions;
+- per-coil self inductance;
+- neighbouring-phase/co-winding mutual inductance information currently extracted by the legacy solve;
+- enough provenance to reproduce and regression-test the calculation.
+
+Preserve the existing `inductancesimcurrent` choice and legacy d/q position semantics unless separately characterized and intentionally changed.
+
+#### Prepared circuit model
+
+Introduce or complete an intrinsic circuit section such as:
+
+```text
+PreparedMachineModel.Circuit
+    ReferenceDCCoilResistance
+    ReferenceDCPhaseResistance
+    DAxisInductance
+    QAxisInductance
+    % self/mutual or matrix representations as required
+```
+
+The exact public representation should make self, mutual, phase and d/q meanings unambiguous.
+
+Reference DC resistance should come from the canonical winding/conductor/path geometry and material model. Do **not** make the resistance returned incidentally by the inductance FEA circuit solve authoritative: legacy subsequently recalculates `CoilResistance` from the winding geometry, and the modern model should preserve that separation of responsibilities.
+
+The prepared circuit model should derive phase values from winding topology (`ParallelBranches`, `CoilsPerBranch`, phases) without mutating the physical winding.
+
+#### Explicit exclusions from 2D
+
+Do not migrate the scenario/network portions of `circuitprops_AM` into the machine-intrinsic circuit model, including:
+
+- `RlVRp` / load resistance;
+- load inductance / `LgVLc`;
+- `LoadModel` selection;
+- machine-side converter parasitic configuration;
+- field-oriented-control PID setup;
+- controller natural-frequency/timestep design;
+- scenario-dependent temperature adjustment;
+- dynamic frequency-dependent resistance application.
+
+Those belong to later simulation/scenario orchestration. The underlying pure conductor skin-effect kernel may exist independently, but integrating scenario frequency/temperature state is not required to close Milestone 2.
+
+#### 2D acceptance criteria
+
+- d-axis and q-axis raw inductance observations match the legacy radial-slotted solves within justified FEA tolerances;
+- self and mutual inductance semantics are explicitly documented and parity-tested;
+- reference DC coil and phase resistance match the established winding/conductor calculations;
+- prepared circuit state is machine-intrinsic and contains no external load/controller state;
+- the canonical `Machine` and `Winding` remain unchanged.
+
+### 22.2.5 Milestone 2E — prepared machine-intrinsic loss models
+
+Milestone 2E migrates the currently active radial-slotted offline loss preparation needed by later ODE simulation. Keep core loss and winding external-field eddy-current loss as separate domain concepts.
+
+#### 2E.1 Core-loss raw observations
+
+The legacy main magnetic FEA gathers spatial core-field samples at every magnetic position. The current modern `MagneticSweepResult` must therefore be extended with explicit raw core-field history before core-loss parity can be claimed.
+
+Use a structure such as:
+
+```text
+MagneticSweepResult.CoreField
+    Position
+    Region(...)
+        SamplingGeometry / coordinates
+        Bx
+        By
+        Bz
+        dV or equivalent integration weights/volumes
+        Provenance
+```
+
+The exact layout may follow the actual core-loss sampling kernel, but raw field history and its spatial weighting must not be hidden inside the prepared fit.
+
+Prefer gathering this data in the existing main magnetic sweep rather than performing another equivalent angular FEA sweep.
+
+#### 2E.2 Core-loss prepared model
+
+Reproduce the currently active legacy `makelossfcns_RADIAL_SLOTTED` / `softferrolossrectregionvarxpartcalc` preparation before changing the physical loss model.
+
+Use an explicit prepared concept such as:
+
+```text
+PreparedMachineModel.Losses.Core
+    Hysteresis
+    ClassicalEddyCurrent
+    Excess
+    evaluate(position, speed)
+```
+
+or an equivalent wrapper that hides the current SLM backend.
+
+Initial parity is with the **currently active** legacy behaviour. In particular, do not silently enable dormant/commented accumulation of additional core-loss regions such as field back iron. If field-back-iron loss is later desired, add it as a separately characterized post-parity enhancement.
+
+Material loss coefficients should ultimately be associated with the appropriate material/component model rather than silently introduced as mutable simulation fields.
+
+#### 2E.3 External-field winding eddy-current loss
+
+Use the existing raw `MagneticSweepResult.SlotFlux` observations to reproduce the legacy `intBdata` → `makesfdeddyslm` path.
+
+Prepared destination:
+
+```text
+PreparedMachineModel.Losses.WindingExternalFieldEddyCurrentLossModel
+    Fit
+    FitMethod
+    evaluate(position, speed)
+```
+
+The implementation must preserve the distinction between:
+
+- winding external-field eddy-current loss;
+- ordinary DC resistance;
+- round-wire skin-effect resistance;
+- unfinished proximity-effect loss.
+
+Use conductor strand diameter/count, material resistivity, turns, winding topology, and `CoilGeometry.ActiveSegmentLengths` as the physical inputs required by the current SFD formulation. Do not substitute full MTL where the legacy calculation uses only active conductor length in the changing field.
+
+#### 2E.4 Loss-model acceptance criteria
+
+- raw core-field histories match legacy observations for representative fixtures;
+- prepared hysteresis/classical-eddy/excess loss functions match the currently active legacy output over representative position/speed grids;
+- winding external-field eddy-current prepared output matches legacy `makesfdeddyslm`/`lossforces_AM` semantics;
+- the prepared loss API does not expose raw SLM objects as the domain abstraction;
+- no proximity-loss parity is claimed;
+- no dormant field-back-iron loss behaviour is opportunistically enabled.
+
+### 22.2.6 Milestone 2F — mass properties and prepared scalar diagnostics
+
+#### Objective
+
+Complete the pure prepared physical properties that legacy `finfun_RADIAL_SLOTTED` derives after magnetic/loss preparation.
+
+#### Mass properties
+
+Use a structured value model such as:
+
+```text
+PreparedMachineModel.MassProperties
+    Field
+        Magnet
+        BackIron
+        Support
+        Total
+        PolarMomentOfInertia
+    Armature
+        Iron
+        Winding
+        Support
+        Total
+    Total
+```
+
+Exact nesting may be adjusted, but electromagnetic component terminology should remain `Field` / `Armature`, not mechanically assumed `Rotor` / `Stator`.
+
+Preserve current mass calculations initially:
+
+- magnet volume/mass;
+- field back-iron volume/mass;
+- winding copper volume/mass;
+- armature-iron volume/mass;
+- currently-zero support/epoxy contributions where that is the active legacy behaviour;
+- total component and machine masses;
+- the current hollow-cylinder approximation for the field component polar moment of inertia where applicable.
+
+Densities must come from the canonical component materials/conductor material, not from a new authoritative `simoptions.Evaluation.*Density` bag.
+
+Using FEA-derived `ArmatureIronArea` for the armature-iron mass is acceptable for Milestone 2 because it is a prepared physical result, unlike canonical winding `PackArea` which must be known before FEA.
+
+#### Prepared diagnostics / scalar observations
+
+Do not leave useful main-sweep observations as anonymous legacy-compatible fields. Give explicit prepared homes to at least the currently consumed quantities:
+
+```text
+PeakArmatureToothFluxDensity
+PeakAirGapFluxDensity
+NominalPerPoleRadialForce
+ForcePerAreaToothSurface
+```
+
+The exact nesting may be chosen during implementation, for example under `Magnetic`, `GapForce`, or `Diagnostics`, provided the semantics are explicit and no quantity is duplicated as contradictory mutable state.
+
+`NominalPerPoleRadialForce` must remain distinct from the full-machine eccentric `GapForce` curve.
+
+#### 2F acceptance criteria
+
+- material volumes/masses and field-component inertia match currently active legacy calculations within deterministic tolerances;
+- material densities are obtained from component-owned materials;
+- armature-iron area provenance remains explicit;
+- nominal force/tooth-area and peak-flux diagnostics match legacy values;
+- `PreparedMachineModel` composition preserves all already-prepared sections.
+
+### 22.2.7 Milestone 2G — integrated radial-slotted preparation workflow
+
+Individual raw and pure-preparation services must remain usable independently, but Milestone 2 is not complete until they are also composed through one supported high-level radial-slotted preparation workflow.
+
+Conceptual API:
+
+```matlab
+[prepared, raw] = rnfoundry.em.rotary.radial.prepare(machine, options)
+```
+
+Exact function naming may differ, but the ordinary user-facing flow should be equivalent to:
+
+```text
+SlottedPMMachine
+  │
+  ├── main magnetic sweep ──────> MagneticSweepResult
+  │                                ├── Magnetic
+  │                                ├── core-loss preparation
+  │                                ├── winding external-field loss
+  │                                ├── mass/diagnostics
+  │                                └── raw geometry/force observations
+  │
+  ├── gap-force sweep ──────────> RadialGapForceSweepResult
+  │                                └── GapForce
+  │
+  └── inductance characterization -> RadialSlottedInductanceResult
+                                   └── Circuit
+
+                       ↓
+
+                PreparedMachineModel
+```
+
+`raw` may be a struct or another simple value container grouping the independent raw result objects. Do not require consumers to discard raw FEA provenance merely because they request the integrated prepared model.
+
+#### Preparation options
+
+The high-level preparation options may expose meaningful engineering/numerical choices such as:
+
+- main magnetic sample count;
+- magnet-skew fitting sample count;
+- whether variable-gap characterization is requested;
+- variable-gap displacement sample locations;
+- whether core-field observations/loss preparation are requested where optional;
+- named mesh sizes;
+- geometry tolerances;
+- future worker/parallel policy at the orchestration boundary.
+
+Do not expose ordinary public switches for:
+
+```text
+UseFemm
+QuietFemm
+SolveMethod
+RotationMethod
+```
+
+The new API chooses the femmsession/sliding-mesh/rebuild mechanics appropriate to the operation.
+
+The orchestration should avoid duplicated FEA work. In particular, loss/mass/diagnostic preparation should consume observations already gathered by the main magnetic sweep wherever possible.
+
+### 22.2.8 FEA resource and parallel-execution constraints
+
+Across all Milestone-2 FEA work:
+
+- resource-owning solver state remains in handle/session objects, never the canonical machine;
+- raw and prepared result objects remain value-semantic;
+- the generic FEA owner must not assume radial sliding mesh;
+- radial angular sweeps may reuse one femmsession where the geometry/AGE contract permits it;
+- eccentric gap-force samples may rebuild full geometry where required for parity;
+- future parallel execution must use one independent session/resource set per worker;
+- implementing parallel orchestration itself is not required for Milestone-2 completion.
+
+### 22.2.9 Milestone-2 regression and parity requirements
+
+Testing must distinguish three categories:
+
+#### Tier 1 — dependency-free deterministic tests
+
+Cover:
+
+- raw value-object validation;
+- pure raw-to-prepared transformations;
+- fit construction/evaluation;
+- winding/circuit topology calculations;
+- resistance calculations;
+- mass/property calculations where fed characterized raw fixtures;
+- immutability/value-copy composition;
+- option validation and public-API architecture constraints.
+
+Run the shared suite under both MATLAB and GNU Octave.
+
+#### Tier 2 — real `xfemm.femmsession` parity
+
+The opt-in FEA test runner remains the authoritative native-runtime availability gate.
+
+Before formally closing Milestone 2, the real-FEA parity tier must have been successfully executed in at least one suitable XFEMM environment, covering the applicable operations:
+
+- main magnetic raw sweep;
+- variable-gap force sweep;
+- d/q inductance characterization;
+- FEA coil-region area as the Issue-#5 regression oracle;
+- raw core-field acquisition.
+
+Representative fixtures should include, where the operation applies:
+
+- external armature, ordinary double layer;
+- internal armature, ordinary double layer;
+- single-layer winding;
+- `CoilLayers = 2`, `yd = 1` / `SplitSlot` case;
+- a supported fractional-slot fixture.
+
+Do not weaken tolerances merely to accommodate unexplained discrepancies. Record and justify FEA-specific tolerances separately from deterministic algebraic tolerances.
+
+#### Legacy parity boundaries
+
+Freeze initial parity for:
+
+- raw main magnetic observations required by modern preparation;
+- flux-linkage lookup/model and peak position;
+- cogging-torque fit and peak;
+- nominal per-pole radial force;
+- full-machine variable-gap force samples and fitted curve;
+- d/q self and mutual inductance;
+- active core-loss prepared functions;
+- external-field winding eddy-current prepared function;
+- reference DC coil/phase resistance;
+- relevant material masses and field-component inertia;
+- peak tooth/air-gap flux diagnostics and tooth-surface force metric.
+
+### 22.2.10 Milestone-2 acceptance criteria
+
+Milestone 2 is complete only when all of the following are true:
+
+1. A valid canonical radial-slotted `SlottedPMMachine` can be passed through one supported high-level preparation workflow to produce a complete `PreparedMachineModel` without mutating the canonical machine.
+2. All new FEA code used by that workflow uses `xfemm.femmsession`; the new API does not depend on `analyse_mfemm`, standalone `fmesher`/`fsolver`/`fpproc`, or public solver-selection flags.
+3. Main magnetic, variable-gap force, and inductance FEA observations are represented by explicit raw value objects and remain separately inspectable from fitted/prepared models.
+4. `PreparedMachineModel` has meaningful populated `Magnetic`, `Circuit`, `Losses`, `GapForce`, and `MassProperties` sections for the radial-slotted family, plus an explicit home for the retained prepared diagnostics.
+5. Issue #5 is complete: exact/controlled-accuracy radial-slotted coil-region area is available without a magnetic solve, canonical `CoilGeometry.PackArea` semantics are explicit, and prepared flux linkage no longer architecturally depends on FEA to complete canonical winding geometry.
+6. Legacy parity is characterized and tested for the magnetic, gap-force, inductance, active loss, resistance, mass/inertia, and scalar diagnostic quantities listed above.
+7. Raw core-field history required by the active legacy core-loss preparation is represented explicitly rather than hidden inside a fit.
+8. The physical `Machine`, `Field`, `Armature`, `Winding`, `Conductor`, and `CoilGeometry` remain value-semantic and solver-free; resource ownership remains confined to FEA handle/session wrappers.
+9. MATLAB and GNU Octave Tier-1 tests pass for the complete Milestone-2 path.
+10. The opt-in real-femmsession Tier-2 parity suite has been successfully run in a working native XFEMM environment before the milestone is formally declared closed.
+11. The integrated preparation workflow avoids avoidable duplicate FEA solves by reusing main-sweep observations for loss, mass, and diagnostic preparation.
+12. No external load, converter/controller, dynamic ODE, optimisation-scoring, or structural-evaluation state has leaked into `PreparedMachineModel` merely to reproduce the legacy monolithic `simfun`/`finfun` structs.
+
+### 22.2.11 Explicitly out of scope for Milestone 2
+
+Do **not** pull the following into Milestone 2 merely because related legacy fields are produced during `simfun_*` / `finfun_*`:
+
+- dynamic ODE simulation or result refactor;
+- `simulatemachine_AM` lifecycle migration;
+- live FEA at each ODE step;
+- external `LoadResistance`, `RlVRp`, load inductance, or load-model orchestration;
+- machine-side converter and field-oriented-controller setup;
+- scenario-dependent temperature/frequency application to the circuit during simulation;
+- full migration of `circuitprops_AM` as a monolithic function;
+- optimisation objective/scoring/evaluation orchestration;
+- structural evaluator/model refactor;
+- advanced proximity-effect winding loss;
+- full litz/rectangular/ribbon conductor implementations;
+- dormant/new field-back-iron core-loss behaviour beyond the currently active legacy calculation;
+- linear-machine FEA/preparation;
+- parallel FEA orchestration/performance work;
+- redesign of the legacy cogging-torque total-torque semantics.
+
+### 22.2.12 Review gate
+
+Stop after the Milestone-2 acceptance criteria are met and review the complete `Machine -> PreparedMachineModel` API before beginning dynamic simulation migration.
+
+The review should confirm that Milestone 3 can consume `PreparedMachineModel` without needing to rediscover missing radial-slotted FEA/preparation work or mutate the canonical machine.
 
 ---
 
