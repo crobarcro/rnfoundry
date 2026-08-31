@@ -1,5 +1,5 @@
 classdef RadialGapForceModel
-    %RADIALGAPFORCEMODEL Legacy quadratic full-machine closing-force fit.
+    %RADIALGAPFORCEMODEL Legacy polynomial full-machine closing-force fit.
     properties (SetAccess = private)
         Polynomial
         CharacterizationDomain
