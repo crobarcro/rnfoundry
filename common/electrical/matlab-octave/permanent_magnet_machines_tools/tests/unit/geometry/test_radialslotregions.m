@@ -45,7 +45,7 @@ g=fixture('o',3,false,false); h=fixture('o',3,false,false);
 assertEqual(g.Nodes,h.Nodes); assertEqual(g.LayerPackAreas,h.LayerPackAreas);
 assertTrue(all(isfinite(g.Nodes(:)))); assertTrue(g.MinimumNodeSeparation>0);
 assertTrue(g.MinimumEdgeLength>1e-6); assertTrue(any(strcmp({g.Edges.Type},'arc')));
-assertTrue(all([g.Edges.Length]>0)); assertTrue(all([g.CoilRegions.ClosureError]<1e-14));
+assertTrue(all([g.Edges.Length]>0)); assertTrue(all([g.CoilRegions.BoundaryClosureError]<1e-14));
 assertElementsAlmostEqual(sum(g.LayerPackAreas),g.TotalPackArea,'absolute',1e-18);
 assertEqual(size(g.BoundaryChordAttachments,1),4);
 end
@@ -66,4 +66,64 @@ function g=fixture(side,layers,split,insulated)
 g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,side, ...
  'NWindingLayers',layers,'SplitSlot',split,'DrawCoilInsulation',insulated, ...
  'CoilInsulationThickness',.0006);
+end
+
+function test_coordinate_frames_and_internal_external_mapping()
+for side=['o','i']
+    g=fixture(side,2,false,false);
+    assertElementsAlmostEqual(g.Nodes(:,1),g.RadialNodes(:,1).*cos(g.RadialNodes(:,2)),'absolute',2e-15);
+    assertElementsAlmostEqual(g.Nodes(:,2),g.RadialNodes(:,1).*sin(g.RadialNodes(:,2)),'absolute',2e-15);
+    assertElementsAlmostEqual(g.CoilLabelLocations(:,1), ...
+        g.RadialCoilLabelLocations(:,1).*cos(g.RadialCoilLabelLocations(:,2)),'absolute',2e-15);
+    if side=='o'
+        assertElementsAlmostEqual(g.MappedRadialNodes(:,1),g.LocalNodes(:,1)+.48,'absolute',2e-15);
+    else
+        assertElementsAlmostEqual(g.MappedRadialNodes(:,1),.48-g.LocalNodes(:,1),'absolute',2e-15);
+    end
+    assertEqual(g.SlotInfo.coillabelloc,g.CoilLabelLocations);
+    assertEqual(g.LegacySlotInfo.coillabelloc,g.LocalCoilLabelLocations);
+end
+end
+function test_divider_arcs_remain_valid_after_chord_attachment()
+for side=['o','i']
+    g=fixture(side,3,false,false);
+    assertEqual(numel(g.PartitionEdgeIds),2);
+    for id=g.PartitionEdgeIds
+        e=g.Edges(id); p=g.Nodes(e.NodeIds,:); radii=sqrt(sum(p.^2,2));
+        assertElementsAlmostEqual(radii(1),radii(2),'absolute',2e-15);
+        assertTrue(strcmp(e.Type,'arc')); assertTrue(isfinite(e.ArcAngle));
+        assertTrue(abs(e.ArcAngle)>1e-6); assertTrue(isfinite(e.Length)&&e.Length>1e-4);
+    end
+end
+end
+function test_topology_validation_is_nonvacuous()
+g=radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o','NWindingLayers',2);
+g.Edges(1).NodeIds=[1 1];
+assertExceptionThrown(@() analyzeRadialSlotRegions(g),'rnfoundry:geometry:MalformedEdge');
+g=radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o','NWindingLayers',2);
+g.CoilLabelLocations(2,:)=g.CoilLabelLocations(1,:);
+assertExceptionThrown(@() analyzeRadialSlotRegions(g),'rnfoundry:geometry:DuplicateLabelFace');
+g=radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o','NWindingLayers',2);
+g.Edges(60)=[];
+assertExceptionThrown(@() analyzeRadialSlotRegions(g),'rnfoundry:geometry:LabelOutsideFace');
+end
+function test_multilayer_feature_characterization()
+% These fixtures exercise divider placement near the base/body and body/shoe
+% portions and densely spaced legacy divisions. Values are physical metres.
+cases={.05,3;.33,4;.70,4;.80,6};
+expected=[1.01470569690398e-4,4.392e-3; ...
+          1.02332278211974e-4,4.392e-3; ...
+          1.079265488220787e-4,4.392e-3; ...
+          1.154455680380752e-4,4.392e-3];
+for k=1:size(cases,1)
+    g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
+        'NWindingLayers',cases{k,2},'CoilBaseFraction',cases{k,1});
+    assertElementsAlmostEqual(g.MinimumStraightSegmentLength,expected(k,1),'absolute',5e-15);
+    assertElementsAlmostEqual(g.MinimumArcLength,expected(k,2),'absolute',5e-15);
+    assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-3);
+    assertTrue(g.MinimumPartitionEdgeLength>4e-2);
+end
+g=fixture('o',3,false,true);
+assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-2);
+assertTrue(g.MinimumPartitionEdgeLength>4e-2);
 end
