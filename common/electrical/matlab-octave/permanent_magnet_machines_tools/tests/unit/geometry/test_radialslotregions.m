@@ -150,53 +150,54 @@ assertTrue(g.MinimumPartitionEdgeLength>4e-2);
 end
 
 function test_targeted_partition_transition_proximity()
-% A body divider deliberately approaches an endpoint of the authoritative
-% base/body-to-shoe chord; repeat in both radial orientations.
+% Tune the legacy area rule to leave a 42.7 um boundary piece at the
+% base/body end of the authoritative body chord, in both orientations.
 for side=['o','i']
     g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,side, ...
-        'NWindingLayers',2,'CoilBaseFraction',.50);
-    d=attachmentEndpointDistances(g);
-    assertTrue(min(d)<1.4e-3); assertTrue(min(d)>1.3e-3);
-    assertTrue(g.MinimumPartitionBoundarySegmentLength<1.4e-3);
+        'NWindingLayers',2,'CoilBaseFraction',.5256);
+    assertEqual(g.BoundaryChordAttachments(:,2:3),[1 111;5 112]);
+    assertTrue(g.MinimumPartitionBoundarySegmentLength>42e-6);
+    assertTrue(g.MinimumPartitionBoundarySegmentLength<43e-6);
+    assertTrue(g.MinimumNodeSeparation>42e-6);
 end
-% With a curved-base-dominated fixture the legacy divider uses an existing
-% sampled boundary node exactly rather than introducing a body attachment.
+% This curved-base partition is exactly the authoritative sampled node pair
+% 81/106, not merely an unspecified coincident boundary node.
 g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
     'NWindingLayers',2,'CoilBaseFraction',.80);
 assertTrue(isempty(g.BoundaryChordAttachments));
+assertEqual(g.Edges(g.PartitionEdgeIds).NodeIds,[81 106]);
 assertPartitionEndpointsMatchBoundaryNodes(g,1e-14);
-% A large-shoe fixture creates sampled-curve partition endpoints (including
-% the shoe portion) that likewise coincide with authoritative nodes.
+% Tune a large-shoe fixture to 34.2 um from the body/shoe chord endpoint;
+% its second partition is explicitly the sampled shoe-node pair 14/39.
+g=radialslotregions([.075 .095],.005,.024,.052,.046,.001,.48,'o', ...
+    'NWindingLayers',3,'CoilBaseFraction',.02);
+assertTrue(g.MinimumPartitionBoundarySegmentLength>34e-6);
+assertTrue(g.MinimumPartitionBoundarySegmentLength<35e-6);
+assertEqual(g.BoundaryChordAttachments(end,2:3),[5 112]);
+% A separate large-shoe fixture identifies the authoritative sampled shoe
+% node pair 14/39 exactly.
 g=radialslotregions([.075 .095],.005,.024,.052,.08,.001,.48,'o', ...
     'NWindingLayers',3,'CoilBaseFraction',.02);
-assertTrue(anyPartitionEndpointMatchesBoundaryNode(g,1e-14));
-% Dense neighbouring legacy layers and explicit insulation retain measured,
-% positive features without #5B snapping.
+assertEqual(g.Edges(g.PartitionEdgeIds(2)).NodeIds,[14 39]);
+% An insulated eight-layer fixture approaches its known insulation-side
+% chord endpoints 176/192 within 2.5 um without snapping.
 g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
-    'NWindingLayers',6,'CoilBaseFraction',.05,'DrawCoilInsulation',true, ...
+    'NWindingLayers',8,'CoilBaseFraction',.504,'DrawCoilInsulation',true, ...
     'CoilInsulationThickness',.0006);
+assertTrue(any(all(g.BoundaryChordAttachments(:,2:3)==[114 176],2)));
+assertTrue(any(all(g.BoundaryChordAttachments(:,2:3)==[137 192],2)));
+assertTrue(g.MinimumPartitionBoundarySegmentLength>2e-6);
+assertTrue(g.MinimumPartitionBoundarySegmentLength<3e-6);
+assertTrue(g.MinimumNodeSeparation>2e-6 && g.MinimumNodeSeparation<3e-6);
+assertTrue(g.MinimumStraightSegmentLength>2e-6 && g.MinimumStraightSegmentLength<3e-6);
+assertTrue(g.MinimumArcLength>4e-3); assertTrue(g.MinimumPartitionEdgeLength>3.9e-2);
+% A valid shallow 16-layer slot provides sub-millimetre neighbouring
+% ordinary dividers; the legacy generator rejects still denser variants.
+g=radialslotregions([.075 .095],.016,.024,.010,.004,.001,.48,'o', ...
+    'NWindingLayers',16,'CoilBaseFraction',.05);
 r=zeros(numel(g.PartitionEdgeIds),1);
 for k=1:numel(r), p=g.Nodes(g.Edges(g.PartitionEdgeIds(k)).NodeIds,:); r(k)=mean(sqrt(sum(p.^2,2))); end
-assertTrue(min(diff(sort(r)))>5e-3);
-assertTrue(g.MinimumStraightSegmentLength>1e-4);
-assertTrue(g.MinimumPartitionBoundarySegmentLength>5e-3);
-end
-function d=attachmentEndpointDistances(g)
-a=g.BoundaryChordAttachments; d=zeros(size(a,1),1);
-for k=1:size(a,1)
-    p=g.Nodes(a(k,1),:); q=g.AuthoritativeBoundaryNodes(a(k,2:3),:);
-    d(k)=min(sqrt(sum((q-p).^2,2)));
-end
-end
-function tf=anyPartitionEndpointMatchesBoundaryNode(g,tol)
-tf=false;
-for id=g.PartitionEdgeIds
-    p=g.Nodes(g.Edges(id).NodeIds,:);
-    for k=1:2
-        d=sqrt(sum((g.AuthoritativeBoundaryNodes-p(k,:)).^2,2));
-        tf=tf || min(d)<tol;
-    end
-end
+assertTrue(min(diff(sort(r)))>0.67e-3 && min(diff(sort(r)))<0.68e-3);
 end
 function assertPartitionEndpointsMatchBoundaryNodes(g,tol)
 for id=g.PartitionEdgeIds

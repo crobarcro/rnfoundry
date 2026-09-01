@@ -31,7 +31,14 @@ function [ RawTorque, ...
 %
 %  simoptions - simulation parameters structure
 %
-%  theta -
+%  theta - angular machine position in radians.
+%
+% Optional inputs include:
+%
+%  'DrawCoilInsulation' - true/false drawing-mode flag controlling whether
+%    explicit coil-insulation regions are included in the FEMM geometry.
+%    Defaults to false. A nonzero design.CoilInsulationThickness does not by
+%    itself enable explicit insulation drawing.
 
 
     Inputs.IsInitialisation = false;

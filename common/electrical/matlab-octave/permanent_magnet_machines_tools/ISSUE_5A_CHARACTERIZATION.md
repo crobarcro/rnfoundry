@@ -122,11 +122,9 @@ current environment because `xfemm.femmsession` was unavailable.
 ## Final review characterization
 
 Targeted fixtures prove the intended situations rather than relying only on
-parameter variation: an external and internal body divider lies between
-`1.3e-3` and `1.4e-3 m` from a fixed-chord transition; curved-base and
-large-shoe cases place divider endpoints exactly on authoritative sampled
-boundary nodes; and a six-layer insulated fixture characterizes neighbouring
-partition radii and remaining boundary segments. No divider is snapped or
+parameter variation: base/body and body/shoe clearances reach tens of
+micrometres, sampled base/shoe node identities are explicit, and an insulated
+fixture reaches a `2.47 um` boundary feature. No divider is snapped or
 repositioned.
 
 FEMM arc primitives are represented by their actual centre, radius, and signed
@@ -134,3 +132,41 @@ sweep. Most radial links are origin-centred; clipped insulation arcs need not
 be. All arc endpoints are validated as co-radial about the represented arc
 centre, and zero/non-finite sweeps or lengths fail deterministically. Exact
 Green-theorem integration includes the general circular-arc centre term.
+
+## Continuous MATLAB FEA execution
+
+The repository workflow now has three independent jobs: Octave Tier 1, MATLAB
+Tier 1, and required MATLAB real FEA. The FEA job uses Ubuntu 22.04 with MATLAB
+R2024b, matching XFEMM's supported MEX compiler pairing. It checks out
+`crobarcro/xfemm` without a ref (latest default development branch, deliberately
+unpinned), prints the exact checkout SHA, builds only the session interfaces via
+`mfemm_setup(..., 'SessionOnly', true)`, runs `Test_femmsession`, and then runs
+the complete `tests/fea` tree. An unavailable native runtime is an Actions
+failure rather than a successful skip. The current upstream revision inspected
+while preparing this workflow was `b4ab66acdfc382ae7c75e20cf8a2e40ac3533319`;
+the authoritative tested SHA is always the value printed by the successful
+Actions run.
+
+Each coil-region oracle comparison prints analytic area, FEMM block-integral
+area, and relative error. The `0.1%` tolerance remains provisional until the new
+job produces its first native results; no successful native result or mesh-
+refinement observation is claimed by this document before that run completes.
+
+## Near-degenerate legacy placement baseline
+
+Deterministic characterization now reaches the tolerance-relevant regime:
+
+- external and internal base/body cases leave `42.7 um` between a partition
+  attachment and the specific authoritative chord endpoint pairs `1/111` and
+  `5/112`;
+- a body/shoe case leaves `34.2 um`, while a separate fixture identifies the
+  sampled shoe-node pair `14/39` exactly;
+- the sampled curved-base fixture identifies node pair `81/106` exactly;
+- an insulated eight-layer case leaves only `2.47 um` at the explicit
+  insulation-side chord pairs `114/176` and `137/192`, with the same value
+  appearing as minimum node separation and straight-segment length;
+- a valid shallow sixteen-layer case produces `0.672 mm` neighbouring-divider
+  spacing.
+
+These fixtures record existing legacy behavior only. Issue #5A performs no
+snapping, repositioning, or minimum-clearance enforcement.

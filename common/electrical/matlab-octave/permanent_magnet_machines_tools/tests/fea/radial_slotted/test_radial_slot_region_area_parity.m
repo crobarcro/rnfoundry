@@ -36,6 +36,9 @@ assertEqual(numel(r.CoilAreas),numel(g.LayerPackAreas));
 % This tolerance is for FEMM boundary-mesh discretization. It should be
 % revisited from observed refinement convergence when Tier 2 is available.
 for k=1:numel(r.CoilAreas)
+    relativeError=abs(r.CoilAreas(k)-g.LayerPackAreas(k))/g.LayerPackAreas(k);
+    fprintf('area parity %s insulation=%d layer=%d analytic=%.16g FEMM=%.16g relative_error=%.6g\n', ...
+        position,drawInsulation,k,g.LayerPackAreas(k),r.CoilAreas(k),relativeError);
     tol=max(1e-9,1e-3*g.LayerPackAreas(k));
     assertTrue(abs(r.CoilAreas(k)-g.LayerPackAreas(k))<=tol);
 end
