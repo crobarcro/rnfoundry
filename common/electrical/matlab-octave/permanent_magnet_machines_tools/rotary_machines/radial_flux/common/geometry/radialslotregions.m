@@ -38,11 +38,27 @@ function geom = radialslotregions(thetacoil, thetashoegap, ryoke, rcoil, ...
         'ShoeCurveControlFrac', in.ShoeCurveControlFrac, ...
         'YScale', roffset + ryoke + rcoil/2, 'SplitX', in.SplitSlot);
 
+    % Ordinary layers may add points to a straight local slot side.  After
+    % radial mapping those points would bend the FEMM chord used by the
+    % one-layer geometry.  Capture the authoritative one-layer perimeter so
+    % newly-created divider endpoints can instead be attached to that fixed
+    % physical chord.  The generic Cartesian generator remains unchanged.
+    boundaryLocalNodes=localNodes; boundaryLinks=links; boundaryInfo=info;
+    if layers > 1
+        [boundaryLocalNodes,boundaryLinks,boundaryInfo]=internalslotnodelinks( ...
+            thetacoil,thetashoegap,ryoke/2,rcoil,rshoebase,rshoegap,1,in.Tol, ...
+            'CoilBaseFraction',in.CoilBaseFraction,'InsulationThickness',tins, ...
+            'ShoeCurveControlFrac',in.ShoeCurveControlFrac, ...
+            'YScale',roffset+ryoke+rcoil/2);
+    end
+    chordAttachments=findChordAttachments(localNodes,links,boundaryLocalNodes,boundaryLinks,in.Tol);
+
     localLabels = info.coillabelloc;
     localInsLabels = info.inslabelloc;
     localShoeLabels = info.shoegaplabelloc;
     if strcmp(side, 'i')
         localNodes(:,1) = -localNodes(:,1);
+        boundaryLocalNodes(:,1) = -boundaryLocalNodes(:,1);
         localLabels(:,1) = -localLabels(:,1);
         if ~isempty(localInsLabels), localInsLabels(:,1)=-localInsLabels(:,1); end
         if ~isempty(localShoeLabels), localShoeLabels(:,1)=-localShoeLabels(:,1); end
@@ -51,12 +67,20 @@ function geom = radialslotregions(thetacoil, thetashoegap, ryoke, rcoil, ...
         error('side must be ''i'' or ''o''.');
     end
     localNodes(:,1) = localNodes(:,1) + roffset;
+    boundaryLocalNodes(:,1) = boundaryLocalNodes(:,1) + roffset;
     localLabels(:,1) = localLabels(:,1) + roffset;
     if ~isempty(localInsLabels), localInsLabels(:,1)=localInsLabels(:,1)+roffset; end
     if ~isempty(localShoeLabels), localShoeLabels(:,1)=localShoeLabels(:,1)+roffset; end
 
     nodes = zeros(size(localNodes));
     [nodes(:,1),nodes(:,2)] = pol2cart(localNodes(:,2),localNodes(:,1));
+    boundaryNodes=zeros(size(boundaryLocalNodes));
+    [boundaryNodes(:,1),boundaryNodes(:,2)]=pol2cart(boundaryLocalNodes(:,2),boundaryLocalNodes(:,1));
+    for k=1:size(chordAttachments,1)
+        nid=chordAttachments(k,1); bid1=chordAttachments(k,2); bid2=chordAttachments(k,3);
+        t=chordAttachments(k,4);
+        nodes(nid,:)=boundaryNodes(bid1,:)+t*(boundaryNodes(bid2,:)-boundaryNodes(bid1,:));
+    end
     labels = zeros(size(localLabels));
     [labels(:,1),labels(:,2)] = pol2cart(localLabels(:,2),localLabels(:,1));
     shoelabels = zeros(size(localShoeLabels));
@@ -110,7 +134,51 @@ function geom = radialslotregions(thetacoil, thetashoegap, ryoke, rcoil, ...
         'LayerPackAreas',reshape([regions.Area],[],1), ...
         'TotalPackArea',sum([regions.Area]),'SlotInfo',info, ...
         'MinimumNodeSeparation',minimumSeparation(nodes), ...
-        'MinimumEdgeLength',min([edges.Length]));
+        'MinimumEdgeLength',min([edges.Length]), ...
+        'BoundaryChordAttachments',chordAttachments, ...
+        'AuthoritativeBoundaryNodes',boundaryNodes, ...
+        'AuthoritativeBoundaryLinks',boundaryLinks, ...
+        'AuthoritativeBoundaryArcLinkIndices',boundaryInfo.vertlinkinds);
+end
+
+function attachments=findChordAttachments(nodes,links,bnodes,blinks,tol)
+    attachments=zeros(0,4); scale=max(1,max(abs(bnodes(:)))); matchtol=max(100*eps(scale),tol*1e-7);
+    nodeMap=zeros(size(nodes,1),1);
+    for i=1:size(nodes,1)
+        [d,j]=min(sqrt(sum((bnodes-nodes(i,:)).^2,2)));
+        if d<=matchtol, nodeMap(i)=j; end
+    end
+    unmatched=find(nodeMap==0)'; resolved=false(size(unmatched));
+    for ui=1:numel(unmatched)
+        i=unmatched(ui); pending=i; visited=[]; boundaryNeighbours=[];
+        while ~isempty(pending)
+            q=pending(1); pending(1)=[];
+            if any(visited==q), continue; end
+            visited(end+1)=q; %#ok<AGROW>
+            incident=find(links(:,1)==q-1 | links(:,2)==q-1);
+            for k=incident'
+                pair=links(k,1:2)+1; neighbour=pair(pair~=q);
+                if nodeMap(neighbour)>0
+                    boundaryNeighbours(end+1)=neighbour; %#ok<AGROW>
+                elseif nodes(neighbour,2)*nodes(i,2)>0
+                    pending(end+1)=neighbour; %#ok<AGROW>
+                end
+            end
+        end
+        mapped=unique(nodeMap(boundaryNeighbours)); mapped(mapped==0)=[];
+        if numel(mapped)~=2, continue; end
+        edge=find((blinks(:,1)==mapped(1)-1 & blinks(:,2)==mapped(2)-1) | ...
+                  (blinks(:,1)==mapped(2)-1 & blinks(:,2)==mapped(1)-1),1);
+        if isempty(edge), continue; end
+        ids=blinks(edge,1:2)+1; a=bnodes(ids(1),:); v=bnodes(ids(2),:)-a;
+        t=sum((nodes(i,:)-a).*v)/sum(v.^2);
+        if ~(t>0 && t<1), continue; end
+        attachments(end+1,:)=[i ids t]; resolved(ui)=true; %#ok<AGROW>
+    end
+    if ~all(resolved)
+        error('rnfoundry:geometry:UnattachedPartition', ...
+              'A radial layer-divider endpoint could not be attached to the fixed slot boundary.');
+    end
 end
 
 function a=signedAngle(p,q)
