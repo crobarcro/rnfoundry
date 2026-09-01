@@ -2,15 +2,22 @@ function test_suite=test_radial_slot_region_area_parity()
 try, test_functions=localfunctions(); catch, end %#ok<NASGU>
 initTestSuite;
 end
-function test_external_all_coil_faces_match_femm()
-assertAreaParity('external');
+function test_external_uninsulated_all_faces_match_femm()
+assertAreaParity('external',false);
 end
-function test_internal_all_coil_faces_match_femm()
-assertAreaParity('internal');
+function test_internal_uninsulated_all_faces_match_femm()
+assertAreaParity('internal',false);
 end
-function assertAreaParity(position)
+function test_external_insulated_all_faces_match_femm()
+assertAreaParity('external',true);
+end
+function test_internal_insulated_all_faces_match_femm()
+assertAreaParity('internal',true);
+end
+function assertAreaParity(position,drawInsulation)
 machine=makeFEASlottedMachine(position);
-r=runLegacyRawMagneticSweep(machine,struct('NPositions',1));
+r=runLegacyRawMagneticSweep(machine,struct('NPositions',1, ...
+    'DrawCoilInsulation',drawInsulation));
 d=machine.toLegacyStruct();
 if strcmp(position,'external')
     side='i'; roffset=d.Rmo+d.g+d.tc(1)+d.tsb+d.ty/2;
@@ -22,12 +29,12 @@ shoe=.5; if isfield(d,'ShoeCurveControlFrac'), shoe=d.ShoeCurveControlFrac; end
 g=radialslotregions(d.thetac,d.thetasg,d.ty,d.tc(1),d.tsb,d.tsg, ...
     roffset,side,'NWindingLayers',d.CoilLayers, ...
     'CoilBaseFraction',basefrac,'ShoeCurveControlFrac',shoe, ...
-    'DrawCoilInsulation',d.CoilInsulationThickness>0, ...
+    'DrawCoilInsulation',drawInsulation, ...
     'CoilInsulationThickness',d.CoilInsulationThickness);
+assertEqual(r.DrawCoilInsulation,drawInsulation);
 assertEqual(numel(r.CoilAreas),numel(g.LayerPackAreas));
-% Block integral 5 integrates the meshed curved boundary. A 0.1% relative
-% tolerance allows normal FEMM boundary-mesh convergence while remaining
-% tighter than the historical 0.25--0.30% layer-count perimeter defect.
+% This tolerance is for FEMM boundary-mesh discretization. It should be
+% revisited from observed refinement convergence when Tier 2 is available.
 for k=1:numel(r.CoilAreas)
     tol=max(1e-9,1e-3*g.LayerPackAreas(k));
     assertTrue(abs(r.CoilAreas(k)-g.LayerPackAreas(k))<=tol);

@@ -94,7 +94,7 @@ function geom = radialslotgeometry(thetacoil, thetashoegap, ryoke, rcoil, ...
 
     nedge=size(links,1);
     edgeTemplate=struct('NodeIds',[0 0],'Type','segment','ArcAngle',0, ...
-        'Length',0,'IsTooth',false,'IsInsulation',false);
+        'ArcCenter',[NaN NaN],'Radius',NaN,'Length',0,'IsTooth',false,'IsInsulation',false);
     edges=repmat(edgeTemplate,nedge,1);
     for k=1:nedge
         ids=links(k,1:2)+1; p=nodes(ids,:);
@@ -104,7 +104,24 @@ function geom = radialslotgeometry(thetacoil, thetashoegap, ryoke, rcoil, ...
         if any(info.vertlinkinds==k)
             edges(k).Type='arc';
             edges(k).ArcAngle=signedAngle(p(1,:),p(2,:));
-            edges(k).Length=mean(sqrt(sum(p.^2,2)))*abs(edges(k).ArcAngle);
+            if ~isfinite(edges(k).ArcAngle) || edges(k).ArcAngle==0
+                error('rnfoundry:geometry:InvalidArc','A radial slot arc has a zero or non-finite sweep.');
+            end
+            chord=p(2,:)-p(1,:); chordLength=norm(chord);
+            leftNormal=[-chord(2),chord(1)]/chordLength;
+            edges(k).ArcCenter=(p(1,:)+p(2,:))/2 + ...
+                leftNormal*chordLength/(2*tan(edges(k).ArcAngle/2));
+            radii=sqrt(sum((p-edges(k).ArcCenter).^2,2));
+            radiusTol=max(1e-12,1e-10*max(radii));
+            if any(~isfinite(radii)) || abs(diff(radii))>radiusTol
+                error('rnfoundry:geometry:InvalidArcRadius', ...
+                      'Arc %d endpoints differ in radius by %.16g.',k,abs(diff(radii)));
+            end
+            edges(k).Radius=radii(1);
+            edges(k).Length=edges(k).Radius*abs(edges(k).ArcAngle);
+            if ~isfinite(edges(k).Length) || edges(k).Length==0
+                error('rnfoundry:geometry:InvalidArc','A radial slot arc has zero or non-finite length.');
+            end
         else
             edges(k).Length=sqrt(sum((p(2,:)-p(1,:)).^2));
         end

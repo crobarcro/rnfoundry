@@ -31,8 +31,8 @@ for side=['o','i']
     assertScaleEqual(g3.TotalPackArea,g1.TotalPackArea);
     assertBoundaryEqual(g1,g2); assertBoundaryEqual(g1,g3);
 end
-assertElementsAlmostEqual(fixture('o',1,false,true).TotalPackArea,.002278073917524149,'absolute',3e-15);
-assertElementsAlmostEqual(fixture('i',1,false,true).TotalPackArea,.001949103878319334,'absolute',3e-15);
+assertElementsAlmostEqual(fixture('o',1,false,true).TotalPackArea,.002278073900072925,'absolute',3e-15);
+assertElementsAlmostEqual(fixture('i',1,false,true).TotalPackArea,.001949103895770560,'absolute',3e-15);
 end
 function test_splitslot_is_physically_symmetric_and_keeps_single_perimeter()
 g1=fixture('o',1,false,false); g=fixture('o',2,true,false);
@@ -45,7 +45,7 @@ g=fixture('o',3,false,false); h=fixture('o',3,false,false);
 assertEqual(g.Nodes,h.Nodes); assertEqual(g.LayerPackAreas,h.LayerPackAreas);
 assertTrue(all(isfinite(g.Nodes(:)))); assertTrue(g.MinimumNodeSeparation>0);
 assertTrue(g.MinimumEdgeLength>1e-6); assertTrue(any(strcmp({g.Edges.Type},'arc')));
-assertTrue(all([g.Edges.Length]>0)); assertTrue(all([g.CoilRegions.BoundaryClosureError]<1e-14));
+assertTrue(all([g.Edges.Length]>0)); assertTrue(all([g.CoilRegions.IsClosed])); assertTrue(all([g.CoilRegions.HalfEdgeCount]>=3));
 assertElementsAlmostEqual(sum(g.LayerPackAreas),g.TotalPackArea,'absolute',1e-18);
 assertEqual(size(g.BoundaryChordAttachments,1),4);
 end
@@ -96,6 +96,24 @@ for side=['o','i']
     end
 end
 end
+function test_every_arc_is_finite_nonzero_and_coradial()
+for side=['o','i']
+    g=fixture(side,3,false,true);
+    for id=find(strcmp({g.Edges.Type},'arc'))
+        e=g.Edges(id); p=g.Nodes(e.NodeIds,:); r=sqrt(sum((p-e.ArcCenter).^2,2));
+        assertTrue(abs(diff(r))<=max(1e-12,1e-10*max(r)));
+        assertTrue(isfinite(e.ArcAngle)&&e.ArcAngle~=0);
+        assertTrue(isfinite(e.Length)&&e.Length>0);
+    end
+end
+end
+function test_invalid_arc_radius_fails_deterministically()
+g=radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o','NWindingLayers',2);
+id=find(strcmp({g.Edges.Type},'arc'),1); nid=g.Edges(id).NodeIds(1);
+g.Nodes(nid,1)=g.Nodes(nid,1)+1e-3;
+assertExceptionThrown(@() analyzeRadialSlotRegions(g), ...
+    'rnfoundry:geometry:InvalidArcRadius');
+end
 function test_topology_validation_is_nonvacuous()
 g=radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o','NWindingLayers',2);
 g.Edges(1).NodeIds=[1 1];
@@ -106,6 +124,9 @@ assertExceptionThrown(@() analyzeRadialSlotRegions(g),'rnfoundry:geometry:Duplic
 g=radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o','NWindingLayers',2);
 g.Edges(60)=[];
 assertExceptionThrown(@() analyzeRadialSlotRegions(g),'rnfoundry:geometry:LabelOutsideFace');
+g=radialslotgeometry(.08,.02,.02,.05,0,0,.5,'o','NWindingLayers',2);
+g.Edges(1).NodeIds(2)=1;
+assertExceptionThrown(@() analyzeRadialSlotRegions(g),'rnfoundry:geometry:OpenFaceWalk');
 end
 function test_multilayer_feature_characterization()
 % These fixtures exercise divider placement near the base/body and body/shoe
@@ -126,4 +147,63 @@ end
 g=fixture('o',3,false,true);
 assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-2);
 assertTrue(g.MinimumPartitionEdgeLength>4e-2);
+end
+
+function test_targeted_partition_transition_proximity()
+% A body divider deliberately approaches an endpoint of the authoritative
+% base/body-to-shoe chord; repeat in both radial orientations.
+for side=['o','i']
+    g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,side, ...
+        'NWindingLayers',2,'CoilBaseFraction',.50);
+    d=attachmentEndpointDistances(g);
+    assertTrue(min(d)<1.4e-3); assertTrue(min(d)>1.3e-3);
+    assertTrue(g.MinimumPartitionBoundarySegmentLength<1.4e-3);
+end
+% With a curved-base-dominated fixture the legacy divider uses an existing
+% sampled boundary node exactly rather than introducing a body attachment.
+g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
+    'NWindingLayers',2,'CoilBaseFraction',.80);
+assertTrue(isempty(g.BoundaryChordAttachments));
+assertPartitionEndpointsMatchBoundaryNodes(g,1e-14);
+% A large-shoe fixture creates sampled-curve partition endpoints (including
+% the shoe portion) that likewise coincide with authoritative nodes.
+g=radialslotregions([.075 .095],.005,.024,.052,.08,.001,.48,'o', ...
+    'NWindingLayers',3,'CoilBaseFraction',.02);
+assertTrue(anyPartitionEndpointMatchesBoundaryNode(g,1e-14));
+% Dense neighbouring legacy layers and explicit insulation retain measured,
+% positive features without #5B snapping.
+g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
+    'NWindingLayers',6,'CoilBaseFraction',.05,'DrawCoilInsulation',true, ...
+    'CoilInsulationThickness',.0006);
+r=zeros(numel(g.PartitionEdgeIds),1);
+for k=1:numel(r), p=g.Nodes(g.Edges(g.PartitionEdgeIds(k)).NodeIds,:); r(k)=mean(sqrt(sum(p.^2,2))); end
+assertTrue(min(diff(sort(r)))>5e-3);
+assertTrue(g.MinimumStraightSegmentLength>1e-4);
+assertTrue(g.MinimumPartitionBoundarySegmentLength>5e-3);
+end
+function d=attachmentEndpointDistances(g)
+a=g.BoundaryChordAttachments; d=zeros(size(a,1),1);
+for k=1:size(a,1)
+    p=g.Nodes(a(k,1),:); q=g.AuthoritativeBoundaryNodes(a(k,2:3),:);
+    d(k)=min(sqrt(sum((q-p).^2,2)));
+end
+end
+function tf=anyPartitionEndpointMatchesBoundaryNode(g,tol)
+tf=false;
+for id=g.PartitionEdgeIds
+    p=g.Nodes(g.Edges(id).NodeIds,:);
+    for k=1:2
+        d=sqrt(sum((g.AuthoritativeBoundaryNodes-p(k,:)).^2,2));
+        tf=tf || min(d)<tol;
+    end
+end
+end
+function assertPartitionEndpointsMatchBoundaryNodes(g,tol)
+for id=g.PartitionEdgeIds
+    p=g.Nodes(g.Edges(id).NodeIds,:);
+    for k=1:2
+        d=sqrt(sum((g.AuthoritativeBoundaryNodes-p(k,:)).^2,2));
+        assertTrue(min(d)<tol);
+    end
+end
 end

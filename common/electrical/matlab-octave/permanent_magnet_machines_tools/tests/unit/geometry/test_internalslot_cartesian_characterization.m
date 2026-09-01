@@ -50,3 +50,20 @@ end
 function v=weighted(x)
 x=x(:); v=x'*(1:numel(x))';
 end
+
+function test_legacy_label_coordinates_and_order_are_frozen()
+[n,~,i]=internalslotnodelinks(.08,.02,.02,.05,.01,.005,1,1e-5); %#ok<ASGLU>
+assertElementsAlmostEqual(i.coillabelloc,[.045 0],'absolute',1e-15);
+assertElementsAlmostEqual(i.shoegaplabelloc,[.0775 0],'absolute',1e-15);
+assertTrue(isempty(i.inslabelloc));
+[~,~,i]=internalslotnodelinks([.075 .095],.016,.012,.052,.009,.004,2,1e-5);
+assertElementsAlmostEqual(i.coillabelloc,[.02513095862751299 0;.05358095862751298 0],'absolute',2e-15);
+assertElementsAlmostEqual(i.shoegaplabelloc,[.071 0],'absolute',1e-15);
+[~,~,i]=internalslotnodelinks(.08,.02,.02,.05,.01,.005,1,1e-5,'SplitX',true);
+assertElementsAlmostEqual(i.coillabelloc,[.04625 .02;.04625 -.02],'absolute',1e-15);
+[~,~,i]=internalslotnodelinks([.075 .095],.016,.012,.052,.009,.004,2,1e-5, ...
+    'InsulationThickness',.0006);
+assertElementsAlmostEqual(i.coillabelloc,[.02545258907203 0;.05357879014405957 0],'absolute',2e-15);
+assertElementsAlmostEqual(i.inslabelloc,[.0123 0],'absolute',1e-15);
+assertElementsAlmostEqual(i.shoegaplabelloc,[.071 0],'absolute',1e-15);
+end

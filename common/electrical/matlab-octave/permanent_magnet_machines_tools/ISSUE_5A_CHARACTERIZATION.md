@@ -36,9 +36,9 @@ After correction, the same external fixture has totals
 `2.420372415911239e-3 m^2` for one, two, and three layers. The internal totals
 are respectively `2.072916254066352e-3`, `2.072916254066354e-3`, and
 `2.072916254066354e-3 m^2`. With `0.6 mm` insulation, external totals are
-`2.278073917524149e-3`, `2.278073917524149e-3`, and
-`2.278073917524146e-3 m^2`; internal totals agree at approximately
-`1.949103878319335e-3 m^2`.
+`2.278073900072925e-3 m^2` within numerical roundoff for one, two, and
+three layers; internal totals likewise agree at approximately
+`1.949103895770560e-3 m^2`.
 
 The ordinary two-layer areas are still deliberately unequal: external
 `1.178404114275779e-3` and `1.241968301635460e-3 m^2`; internal
@@ -52,7 +52,7 @@ The solver-free kernel consumes the nodes, links, labels, insulation topology,
 and `vertlinkinds` produced by `internalslotnodelinks`, then performs the same
 orientation, offset, and radial mapping as the FEMM drawing. Areas use Green's
 theorem over actual FEMM primitives: Cartesian cross products for segments and
-`r^2*dtheta/2` for origin-centred arcs. Polygon sampling is used only for
+the exact centre/radius/sweep integral for general circular arcs. Polygon sampling is used only for
 label-to-face lookup.
 
 Legacy `CoilArea` is FEMM block integral 5 at the first coil label. It means the
@@ -87,8 +87,8 @@ label locations for drawing consumers.
 Face closure is validated from the directed half-edge walk and consecutive
 edge-node identities before a polygon is closed for point containment. Open or
 malformed edges, ambiguous assignments, missing faces, and duplicate label-to-
-face assignments have deterministic errors. Each region records its face index,
-closed status, and measured boundary connection error.
+face assignments have deterministic errors. Each region records its face index, closed status, and directed half-edge
+count; the former structurally-zero numeric closure metric has been removed.
 
 ## Tolerance and minimum-feature characterization
 
@@ -107,9 +107,30 @@ redesign, snapping, and physical minimum-feature enforcement to Issue #5B.
 
 ## FEMM oracle
 
-The opt-in Tier-2 test `test_radial_slot_region_area_parity` runs the ordinary
-internal and external two-layer fixtures through `xfemm.femmsession`, evaluates
-block integral 5 at every layer label, and compares every result with the pure
-Green-theorem area. Its `0.1%` relative tolerance permits normal boundary-mesh
-convergence while remaining tighter than the original `0.25--0.30%`
-layer-count perimeter defect. Tier 1 remains solver-free.
+The opt-in Tier-2 test `test_radial_slot_region_area_parity` commits four
+explicit drawing modes: external/internal ordinary two-layer geometry with
+insulation off, and external/internal ordinary two-layer geometry with
+insulation on. `DrawCoilInsulation` is passed independently to both the legacy
+FEA helper and pure geometry; it is not inferred from nonzero canonical
+insulation thickness. Every layer label is checked with block integral 5. The
+provisional `0.1%` relative tolerance represents expected boundary-mesh
+discretization and must be reviewed against observed mesh refinement when a
+native runtime is available. These Tier-2 cases were not executed in the
+current environment because `xfemm.femmsession` was unavailable.
+
+
+## Final review characterization
+
+Targeted fixtures prove the intended situations rather than relying only on
+parameter variation: an external and internal body divider lies between
+`1.3e-3` and `1.4e-3 m` from a fixed-chord transition; curved-base and
+large-shoe cases place divider endpoints exactly on authoritative sampled
+boundary nodes; and a six-layer insulated fixture characterizes neighbouring
+partition radii and remaining boundary segments. No divider is snapped or
+repositioned.
+
+FEMM arc primitives are represented by their actual centre, radius, and signed
+sweep. Most radial links are origin-centred; clipped insulation arcs need not
+be. All arc endpoints are validated as co-radial about the represented arc
+centre, and zero/non-finite sweeps or lengths fail deterministically. Exact
+Green-theorem integration includes the general circular-arc centre term.
