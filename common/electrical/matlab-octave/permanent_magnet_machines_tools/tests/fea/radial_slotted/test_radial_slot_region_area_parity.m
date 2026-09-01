@@ -16,8 +16,8 @@ assertAreaParity('internal',true);
 end
 function assertAreaParity(position,drawInsulation)
 machine=makeFEASlottedMachine(position);
-r=runLegacyRawMagneticSweep(machine,struct('NPositions',1, ...
-    'DrawCoilInsulation',drawInsulation));
+r=runLegacyRawMagneticSweep(machine,struct('NPositions',2, ...
+    'DrawCoilInsulation',drawInsulation,'AreaOnly',true));
 d=machine.toLegacyStruct();
 if strcmp(position,'external')
     side='i'; roffset=d.Rmo+d.g+d.tc(1)+d.tsb+d.ty/2;

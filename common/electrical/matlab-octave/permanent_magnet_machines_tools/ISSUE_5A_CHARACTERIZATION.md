@@ -152,6 +152,18 @@ area, and relative error. The `0.1%` tolerance remains provisional until the new
 job produces its first native results; no successful native result or mesh-
 refinement observation is claimed by this document before that run completes.
 
+The first Actions execution built and probed XFEMM successfully but exposed
+three test-fixture defects before all four comparisons could run: the area-only
+helper requested the invalid public sweep value `NPositions = 1`, the internal
+fixture reached an optional `check.ismonatonicvec` dependency, and explicit
+insulation lacked a fixture material. The helper now resolves the supported
+`NPositions = 2` contract and then deliberately solves only its first position;
+the monotonic check is self-contained, and the fixture supplies an explicit
+insulation material. A local native external/uninsulated check measured relative
+errors of `0.01683%` and `0.01846%` for the two regions, comfortably below the
+provisional `0.1%` mesh-discretization tolerance. The MATLAB Actions rerun,
+rather than that local check, remains authoritative for merge readiness.
+
 ## Near-degenerate legacy placement baseline
 
 Deterministic characterization now reaches the tolerance-relevant regime:

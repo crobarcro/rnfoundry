@@ -1,18 +1,23 @@
 function result=runLegacyRawMagneticSweep(machine,options)
 %RUNLEGACYRAWMAGNETICSWEEP Established feasim femmsession oracle for tests.
 if ~isfield(options,'DrawCoilInsulation'), options.DrawCoilInsulation=false; end
-drawCoilInsulation=options.DrawCoilInsulation;
-options=rmfield(options,'DrawCoilInsulation');
+% The area oracle needs one solved position, but the public sweep option
+% contract deliberately requires NPositions >= 2. AreaOnly is a test-helper
+% concern applied after resolving that public contract.
+if ~isfield(options,'AreaOnly'), options.AreaOnly=false; end
+drawCoilInsulation=options.DrawCoilInsulation; areaOnly=options.AreaOnly;
+options=rmfield(options,{'DrawCoilInsulation','AreaOnly'});
 o=rnfoundry.em.rotary.radial.resolveMagneticSweepOptions(machine,options);
 d=machine.toLegacyStruct(); d.MagFEASimMaterials.AirGap=o.AirGapMaterial;
 d.FirstSlotCenter=0; d.MagFEASimPositions=linspace(0,1,o.NPositions);
+if areaOnly, d.MagFEASimPositions=d.MagFEASimPositions(1); end
 simoptions=struct('DoBackIronCoreLoss',false,'MagFEASim',struct( ...
     'MagnetRegionMeshSize',o.MagnetRegionMeshSize, ...
     'BackIronRegionMeshSize',o.BackIronRegionMeshSize, ...
     'AirGapMeshSize',o.AirGapMeshSize,'OuterRegionsMeshSize',o.OuterRegionsMeshSize, ...
     'YokeRegionMeshSize',o.YokeRegionMeshSize,'CoilRegionMeshSize',o.CoilRegionMeshSize, ...
     'ShoeGapRegionMeshSize',o.ShoeGapRegionMeshSize));
-np=max(1,ceil(d.pb/2)); n=o.NPositions; session=[];
+np=max(1,ceil(d.pb/2)); n=o.NPositions; if areaOnly, n=1; end; session=[];
 for k=1:n
     extra={}; if k>1, extra={'FemmSession',session}; end
     [torque(k,1),~,~,tooth(k,1),flux,apos,aint,bpos,bint,d,session]= ...
