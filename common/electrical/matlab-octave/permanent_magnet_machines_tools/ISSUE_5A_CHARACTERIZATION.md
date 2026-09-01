@@ -141,9 +141,15 @@ R2024b, matching XFEMM's supported MEX compiler pairing. It checks out
 `crobarcro/xfemm` without a ref (latest default development branch, deliberately
 unpinned), prints the exact checkout SHA, builds only the session interfaces via
 `mfemm_setup(..., 'SessionOnly', true)`, runs `Test_femmsession`, and then runs
-the complete `tests/fea` tree. An unavailable native runtime is an Actions
-failure rather than a successful skip. The current upstream revision inspected
-while preparing this workflow was `b4ab66acdfc382ae7c75e20cf8a2e40ac3533319`;
+the complete `tests/fea` tree. Each FEA test file, and each slot-area drawing
+mode, runs in a fresh MATLAB process. This preserves complete coverage while
+returning XFEMM's native mesh and solver memory between fixtures; the previous
+single-process run exhausted the hosted runner after approximately six minutes
+and caused it to lose communication with Actions. An unavailable native runtime
+is an Actions failure rather than a successful skip. The separate JUnit files
+are uploaded together as the MATLAB FEA artifact. The current upstream revision
+inspected while preparing this workflow was
+`b4ab66acdfc382ae7c75e20cf8a2e40ac3533319`;
 the authoritative tested SHA is always the value printed by the successful
 Actions run.
 
