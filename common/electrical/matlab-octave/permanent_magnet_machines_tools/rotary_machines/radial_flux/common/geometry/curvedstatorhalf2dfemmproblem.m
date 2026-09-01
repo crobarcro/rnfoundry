@@ -121,104 +121,38 @@ function [FemmProblem, outernodes, coillabellocs, slotinfo] = curvedstatorhalf2d
     
     elcount = elementcount_mfemm(FemmProblem);
     
-    if Inputs.DrawCoilInsulation
-        insulationthickness = Inputs.CoilInsulationThickness;
-    else
-        insulationthickness = 0;
-    end
-    
-    if Inputs.SplitSlot
-        if Inputs.NWindingLayers ~= 2
-            error ('If SplitSlot is true, NWindingLayers must be equal to 2');
-        else
-            % set the number of winding layers to 1, as
-            % internalslotnodelinks will split it into two coil sides in
-            % the case
-            Inputs.NWindingLayers = 1;
-        end
-    end
-    
-    % make a single slot
-    [nodes, links, slotinfo] = internalslotnodelinks( thetacoil, thetashoegap, ryoke/2, rcoil, ...
-                                   rshoebase, rshoegap, Inputs.NWindingLayers, Inputs.Tol, ...
-                                   'CoilBaseFraction', Inputs.CoilBaseFraction, ...
-                                   'InsulationThickness', insulationthickness, ...
-                                   'ShoeCurveControlFrac', Inputs.ShoeCurveControlFrac, ...
-                                   'YScale', roffset + ryoke + rcoil/2, ...
-                                   'SplitX', Inputs.SplitSlot );
-
-    links = [ links, ismember(1:size(links,1),slotinfo.vertlinkinds)', ismember(1:size(links,1),slotinfo.toothlinkinds)' ];
-    
+    % Build the authoritative single-slot physical geometry without FEMM.
+    % radialslotregions applies the same legacy layer placement and radial
+    % mapping, and additionally exposes exact physical coil-region areas.
+    slotgeom = radialslotregions(thetacoil, thetashoegap, ryoke, rcoil, ...
+        rshoebase, rshoegap, roffset, side, ...
+        'NWindingLayers', Inputs.NWindingLayers, 'Tol', Inputs.Tol, ...
+        'CoilBaseFraction', Inputs.CoilBaseFraction, ...
+        'ShoeCurveControlFrac', Inputs.ShoeCurveControlFrac, ...
+        'SplitSlot', Inputs.SplitSlot, ...
+        'DrawCoilInsulation', Inputs.DrawCoilInsulation, ...
+        'CoilInsulationThickness', Inputs.CoilInsulationThickness);
+    nodes = slotgeom.Nodes;
+    links = slotgeom.Links;
+    slotinfo = slotgeom.SlotInfo;
+    slotinfo.coillabelloc = slotgeom.CoilLabelLocations;
+    slotinfo.shoegaplabelloc = slotgeom.ShoeGapLabelLocations;
+    slotinfo.inslabelloc = slotgeom.InsulationLabelLocations;
+    slotinfo.PhysicalGeometry = slotgeom;
     coillabellocs = [];
-    
-    % we flip the node positions if we are drawing an internally facing
-    % stator
-    if strcmp(side, 'i')
-        
-        nodes(:,1) = -nodes(:,1);
-        
-        if ~isempty(slotinfo.shoegaplabelloc)
-            slotinfo.shoegaplabelloc(:,1) = -slotinfo.shoegaplabelloc(:,1);
-        end
-        
-        if ~isempty(slotinfo.coillabelloc)
-            slotinfo.coillabelloc(:,1) = -slotinfo.coillabelloc(:,1);
-        end
-        
-        if ~isempty (slotinfo.inslabelloc)
-            slotinfo.inslabelloc(:,1) = -slotinfo.inslabelloc(:,1);
-        end
-        
-        % rearrange the corner nodes to preserve clockwise ordering
-        % starting from bottom left
-        slotinfo.cornernodes = [slotinfo.cornernodes(2), slotinfo.cornernodes(1), slotinfo.cornernodes(4), slotinfo.cornernodes(3)]; 
-    end
-    
-    % add the specified offset in the radial direction
-    nodes(:,1) = nodes(:,1) + roffset;
 
-    if ~isempty(slotinfo.shoegaplabelloc)
-        slotinfo.shoegaplabelloc(:,1) = slotinfo.shoegaplabelloc(:,1) + roffset;
+    % FEMM arc records require a positive angle and the historical endpoint
+    % ordering.  The pure result retains signed direction independently.
+    angles = zeros(numel(slotinfo.vertlinkinds),1);
+    for k = 1:numel(slotinfo.vertlinkinds)
+        li = slotinfo.vertlinkinds(k);
+        da = slotgeom.Edges(li).ArcAngle;
+        if da > 0, links(li,1:2) = fliplr(links(li,1:2)); end
+        angles(k) = abs(rad2deg(da));
     end
+    links = [links, ismember(1:size(links,1),slotinfo.vertlinkinds)', ...
+                    ismember(1:size(links,1),slotinfo.toothlinkinds)'];
 
-    if ~isempty(slotinfo.coillabelloc)
-        slotinfo.coillabelloc(:,1) = slotinfo.coillabelloc(:,1) + roffset;
-    end
-    
-    if ~isempty(slotinfo.inslabelloc)
-        slotinfo.inslabelloc(:,1) = slotinfo.inslabelloc(:,1) + roffset;
-    end
-    
-	% convert vertical links to arc segments
-    vertlinks = links(slotinfo.vertlinkinds,1:2);
-    angles = diff( [nodes(vertlinks(:,1)+1,2), nodes(vertlinks(:,2)+1,2)], 1, 2);
-    
-    % correct vertical links which are in the wrong direction
-    for i = 1:size(vertlinks,1)
-        if angles(i) < 0
-            vertlinks(i,:) = fliplr(vertlinks(i,:));
-            angles(i) = abs(angles(i));
-        end
-    end
-    
-    % convert angles to degrees
-    angles = rad2deg(angles);
-    vertlinks = fliplr(vertlinks);
-    links(slotinfo.vertlinkinds, 1:2) = vertlinks;
-    
-    % transform the node locations to convert the rectangular region to the
-    % desired arced region 
-    [nodes(:,1), nodes(:,2)] = pol2cart(nodes(:,2), nodes(:,1));
-    if ~isempty(slotinfo.shoegaplabelloc)
-        [slotinfo.shoegaplabelloc(:,1), slotinfo.shoegaplabelloc(:,2)] = pol2cart(slotinfo.shoegaplabelloc(:,2),slotinfo.shoegaplabelloc(:,1));
-    end
-    
-    [slotinfo.coillabelloc(:,1), slotinfo.coillabelloc(:,2)] = pol2cart(slotinfo.coillabelloc(:,2),slotinfo.coillabelloc(:,1));
-    
-    if ~isempty(slotinfo.inslabelloc)
-        [slotinfo.inslabelloc(:,1), slotinfo.inslabelloc(:,2)] = pol2cart(slotinfo.inslabelloc(:,2),slotinfo.inslabelloc(:,1));
-    end
-    
     % store the nodes at the bottom of all the slots
     bottomnodes = slotinfo.cornernodes([4,3]) + elcount.NNodes;  
     lastslotcornernodes = slotinfo.cornernodes + elcount.NNodes;    

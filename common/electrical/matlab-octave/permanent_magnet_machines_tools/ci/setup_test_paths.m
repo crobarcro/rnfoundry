@@ -17,6 +17,10 @@ addpath(fullfile(moxunitRoot,'MOxUnit'));
 moxunit_set_path();
 addpath(genpath(toolboxRoot));
 addpath(fullfile(repoRoot,'common','matlab-octave','misc'));
+addpath(fullfile(repoRoot,'common','matlab-octave','curve_fitting_and_evaluation'));
+addpath(fullfile(repoRoot,'common','matlab-octave','math','vector_algebra'));
+addpath(fullfile(repoRoot,'common','matlab-octave','math','geometry'));
+addpath(fullfile(repoRoot,'common','matlab-octave','constants_and_conversions'));
 addpath(fullfile(repoRoot,'common','matlab-octave','curve_fitting_and_evaluation', ...
     'tb-shape_language_modelling'));
 addpath(fullfile(repoRoot,'common','matlab-octave','curve_fitting_and_evaluation', ...
