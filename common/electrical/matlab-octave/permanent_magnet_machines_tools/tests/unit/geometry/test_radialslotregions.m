@@ -78,10 +78,13 @@ for side=['o','i']
     assertElementsAlmostEqual(g.Nodes(:,2),g.RadialNodes(:,1).*sin(g.RadialNodes(:,2)),'absolute',2e-15);
     assertElementsAlmostEqual(g.CoilLabelLocations(:,1), ...
         g.RadialCoilLabelLocations(:,1).*cos(g.RadialCoilLabelLocations(:,2)),'absolute',2e-15);
+    assertElementsAlmostEqual(g.RadialCoilLabelLocations(:,2),g.LocalCoilLabelLocations(:,2),'absolute',2e-15);
     if side=='o'
         assertElementsAlmostEqual(g.MappedRadialNodes(:,1),g.LocalNodes(:,1)+.48,'absolute',2e-15);
+        assertElementsAlmostEqual(g.RadialCoilLabelLocations(:,1),g.LocalCoilLabelLocations(:,1)+.48,'absolute',2e-15);
     else
         assertElementsAlmostEqual(g.MappedRadialNodes(:,1),.48-g.LocalNodes(:,1),'absolute',2e-15);
+        assertElementsAlmostEqual(g.RadialCoilLabelLocations(:,1),.48-g.LocalCoilLabelLocations(:,1),'absolute',2e-15);
     end
     assertEqual(g.SlotInfo.coillabelloc,g.CoilLabelLocations);
     assertEqual(g.LegacySlotInfo.coillabelloc,g.LegacyLocalCoilLabelLocations);

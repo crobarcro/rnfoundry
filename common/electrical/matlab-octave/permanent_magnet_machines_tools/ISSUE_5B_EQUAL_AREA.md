@@ -35,8 +35,4 @@ Legacy `CoilArea`/`PackArea` build inputs are accepted as deprecated ignored inp
 and cannot override exact geometry. Issue #5C remains: magnetic preparation still
 consumes raw FEA coil-area diagnostics and is intentionally unchanged here.
 
-Construction uses `radialslotknownareas` rather than the public
-`analyzeRadialSlotRegions` entry point, and both evaluators share `greenareaedge`
-for exact line and general circular-arc Green contributions. The construction-side
-evaluator is private to the known radial-slot graph contract; `radialslotregions`
-still invokes the public analyzer independently after construction.
+Construction seeds a directed boundary walk from the single known ordinary divider and integrates only the two adjacent slot-region loops with `radialslotcumulativearea`. It performs no arbitrary face discovery, polygon construction, `inpolygon`, or label assignment. Construction and the independent public analyzer share `greenareaedge` for exact line and general non-origin-centred circular-arc contributions; `radialslotregions` invokes the public analyzer only after construction.
