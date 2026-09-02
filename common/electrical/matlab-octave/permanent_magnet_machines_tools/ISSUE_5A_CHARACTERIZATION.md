@@ -154,16 +154,16 @@ outside the radial-slot-area work prevent the oracle from running. An
 unavailable native runtime is an Actions failure rather than a successful skip.
 Separate JUnit files are uploaded together as the MATLAB FEA artifact.
 
-Actions run `33599556435` tested XFEMM revision
-`b4ab66acdfc382ae7c75e20cf8a2e40ac3533319` and passed both external modes.
-The checkout deliberately remains unpinned, and every run prints the exact SHA.
-Observed external relative errors were `0.01683%` and `0.01846%` without
-insulation, and `0.01839%` and `0.02270%` with insulation. A local native run of
-the bounded internal fixture completed in approximately `1.1 s` uninsulated
-and `1.5 s` insulated, with errors of `0.01739%` / `0.01457%` and `0.01387%` /
-`0.01331%`, respectively. These results support the retained `0.1%` tolerance
-as a conservative FEMM boundary-discretization allowance; no mesh-convergence
-precision beyond this comparison is claimed.
+Final Actions run `33613664859` passed MATLAB Tier 1, GNU Octave Tier 1, and
+the MATLAB real-FEA job. It tested XFEMM revision
+`b4ab66acdfc382ae7c75e20cf8a2e40ac3533319`; the checkout deliberately remains
+unpinned, and every run prints the exact SHA. All four external/internal,
+insulated/uninsulated modes ran real solves and passed. Observed relative errors
+were `0.01683%` / `0.01846%` externally without insulation, `0.01839%` /
+`0.02270%` externally with insulation, `0.01739%` / `0.01457%` internally
+without insulation, and `0.01387%` / `0.01331%` internally with insulation.
+These results are comfortably within the retained `0.1%` FEMM discretization
+tolerance; no full mesh-convergence study or stronger precision claim is made.
 
 | Drawing mode | Layer | Analytic area (m^2) | FEMM area (m^2) | Relative error |
 | --- | ---: | ---: | ---: | ---: |
@@ -179,8 +179,7 @@ precision beyond this comparison is claimed.
 The earlier full-machine internal fixture exceeded `8 GiB` during meshing. The
 bounded fixture is not a synthetic replacement for slot geometry: it uses the
 production single-slot drawer and changes only the unnecessary surrounding FEA
-domain. The internal Actions results must still be recorded from the final run
-before merge readiness is claimed.
+domain. Both bounded internal modes passed the final Actions run.
 
 ## Near-degenerate legacy placement baseline
 

@@ -1021,10 +1021,9 @@ function [FemmProblem, statorinfo] = stator_outer_regions (FemmProblem, design, 
                         'specified as a fraction of the inner yoke radius ', ...
                         'and must lie in the reion 0 <= x <= 1'] );
             end
-            % Check if stator outer region sizes are monotonically
-            % decreasing. Keep this validation local so constructing the
-            % legacy FEA oracle does not depend on an optional check package.
-            assert ( all (diff (Inputs.StatorOuterRegionSize) < 0), ...
+            % check if stator outer region sizes are monatonically
+            % increasing
+            assert ( check.ismonatonicvec (Inputs.StatorOuterRegionSize, false), ...
                 'RENEWNET:slottedfemmproblem_radial:increasestatorouterregions', ...
                 'StatorOuterRegionSize should be a monatonically decreasing vector (i.e. each value smaller than the previous).');
 
