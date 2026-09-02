@@ -107,16 +107,21 @@ redesign, snapping, and physical minimum-feature enforcement to Issue #5B.
 
 ## FEMM oracle
 
-The opt-in Tier-2 test `test_radial_slot_region_area_parity` commits four
-explicit drawing modes: external/internal ordinary two-layer geometry with
-insulation off, and external/internal ordinary two-layer geometry with
-insulation on. `DrawCoilInsulation` is passed independently to both the legacy
-FEA helper and pure geometry; it is not inferred from nonzero canonical
-insulation thickness. Every layer label is checked with block integral 5. The
-provisional `0.1%` relative tolerance represents expected boundary-mesh
-discretization and must be reviewed against observed mesh refinement when a
-native runtime is available. These Tier-2 cases were not executed in the
-current environment because `xfemm.femmsession` was unavailable.
+The Tier-2 area oracle covers four explicit drawing modes: external/internal
+ordinary two-layer geometry with insulation off, and external/internal ordinary
+two-layer geometry with insulation on. `DrawCoilInsulation` is passed
+independently to both FEMM and pure geometry; it is not inferred from nonzero
+canonical insulation thickness. Every layer label is checked independently
+with block integral 5.
+
+The bounded oracle calls `curvedstatorhalf2dfemmproblem` for one real slot, so
+it exercises the same `radialslotgeometry` construction, internal reflection,
+FEMM line/arc conversion, and physical labels as production drawing. It closes
+that otherwise intentionally open drawing in a small zero-source air box and
+solves it with `xfemm.femmsession`. Omitting the rotor, repeated slots, iron,
+and unrelated magnetic post-processing changes neither the slot boundary nor
+its block-integral area, but avoids the pathological refinement of the former
+full internal-machine fixture.
 
 
 ## Final review characterization
@@ -141,47 +146,41 @@ R2024b, matching XFEMM's supported MEX compiler pairing. It checks out
 `crobarcro/xfemm` without a ref (latest default development branch, deliberately
 unpinned), prints the exact checkout SHA, builds only the session interfaces via
 `mfemm_setup(..., 'SessionOnly', true)`, runs `Test_femmsession`, and then runs
-the external uninsulated and insulated Issue #5A area-oracle fixtures in fresh
-MATLAB processes. The broader raw-sweep and gap-force Tier-2 tests remain
+all four external/internal Issue #5A area-oracle modes in fresh MATLAB
+processes. The broader raw-sweep and gap-force Tier-2 tests remain
 available through `run_fea_tests` for opt-in local testing, but are excluded
 from this focused gate: they exercise unrelated solver parity and made failures
-outside the radial-slot-area work prevent the oracle from running. The current
-development mesher also refines the existing full-machine internal fixture
-pathologically (more than 8 GiB locally), so its committed internal area cases
-remain opt-in pending a bounded internal FEA fixture. Internal orientation is
-still covered by the pure Tier-1 geometry tests. An unavailable native runtime
-is an Actions failure rather than a successful skip. Separate JUnit files are
-uploaded together as the MATLAB FEA artifact. The current upstream revision
-inspected while preparing this workflow was
-`b4ab66acdfc382ae7c75e20cf8a2e40ac3533319`;
-the authoritative tested SHA is always the value printed by the successful
-Actions run.
+outside the radial-slot-area work prevent the oracle from running. An
+unavailable native runtime is an Actions failure rather than a successful skip.
+Separate JUnit files are uploaded together as the MATLAB FEA artifact.
 
-Each coil-region oracle comparison prints analytic area, FEMM block-integral
-area, and relative error. The `0.1%` tolerance remains provisional until the new
-job produces its first native results; no successful native result or mesh-
-refinement observation is claimed by this document before that run completes.
+Actions run `33599556435` tested XFEMM revision
+`b4ab66acdfc382ae7c75e20cf8a2e40ac3533319` and passed both external modes.
+The checkout deliberately remains unpinned, and every run prints the exact SHA.
+Observed external relative errors were `0.01683%` and `0.01846%` without
+insulation, and `0.01839%` and `0.02270%` with insulation. A local native run of
+the bounded internal fixture completed in approximately `1.1 s` uninsulated
+and `1.5 s` insulated, with errors of `0.01739%` / `0.01457%` and `0.01387%` /
+`0.01331%`, respectively. These results support the retained `0.1%` tolerance
+as a conservative FEMM boundary-discretization allowance; no mesh-convergence
+precision beyond this comparison is claimed.
 
-The first process-isolated rerun did not exhaust its runner: it failed after
-the external legacy sweep completed because the modern session owner checked a
-package-qualified class with `exist(..., 'class')`. That check can return false
-even when `which('xfemm.femmsession')` resolves the class and the MEX runtime has
-already passed its probe. The session owner now uses the same portable `which`
-check as the Tier-2 availability gate. This diagnosis also confirmed that the
-gap-force test was not the step which failed, although it is now excluded from
-the focused Issue #5A Actions gate to reduce unrelated native resource use.
+| Drawing mode | Layer | Analytic area (m^2) | FEMM area (m^2) | Relative error |
+| --- | ---: | ---: | ---: | ---: |
+| external, insulation off | 1 | `1.204389094346384e-4` | `1.204591789828378e-4` | `0.01683%` |
+| external, insulation off | 2 | `1.078443473065970e-4` | `1.078244395298201e-4` | `0.01846%` |
+| external, insulation on | 1 | `1.201061695305003e-4` | `1.201282606028852e-4` | `0.01839%` |
+| external, insulation on | 2 | `9.502697391254811e-5` | `9.500539870493741e-5` | `0.02270%` |
+| internal, insulation off | 1 | `8.549729287503225e-5` | `8.548242171855098e-5` | `0.01739%` |
+| internal, insulation off | 2 | `9.939552693688153e-5` | `9.941001350274738e-5` | `0.01457%` |
+| internal, insulation on | 1 | `8.543818596916147e-5` | `8.542634000718536e-5` | `0.01387%` |
+| internal, insulation on | 2 | `8.454755084816541e-5` | `8.455880135472243e-5` | `0.01331%` |
 
-The first Actions execution built and probed XFEMM successfully but exposed
-three test-fixture defects before all four comparisons could run: the area-only
-helper requested the invalid public sweep value `NPositions = 1`, the internal
-fixture reached an optional `check.ismonatonicvec` dependency, and explicit
-insulation lacked a fixture material. The helper now resolves the supported
-`NPositions = 2` contract and then deliberately solves only its first position;
-the monotonic check is self-contained, and the fixture supplies an explicit
-insulation material. A local native external/uninsulated check measured relative
-errors of `0.01683%` and `0.01846%` for the two regions, comfortably below the
-provisional `0.1%` mesh-discretization tolerance. The MATLAB Actions rerun,
-rather than that local check, remains authoritative for merge readiness.
+The earlier full-machine internal fixture exceeded `8 GiB` during meshing. The
+bounded fixture is not a synthetic replacement for slot geometry: it uses the
+production single-slot drawer and changes only the unnecessary surrounding FEA
+domain. The internal Actions results must still be recorded from the final run
+before merge readiness is claimed.
 
 ## Near-degenerate legacy placement baseline
 

@@ -1,17 +1,7 @@
 function assertRadialSlotRegionAreaParity(position,drawInsulation)
 %ASSERTRADIALSLOTREGIONAREAPARITY Compare every exact region with FEMM.
 machine=makeFEASlottedMachine(position);
-% Area parity does not need the production magnetic-sweep refinement. Using
-% FEMM automatic region meshes reduces the oracle's native-memory footprint;
-% the actual line/arc boundary remains unchanged.
-meshOptions=struct('MagnetRegionMeshSize',-1,'BackIronRegionMeshSize',-1, ...
-    'AirGapMeshSize',-1,'OuterRegionsMeshSize',[-1,-1], ...
-    'YokeRegionMeshSize',-1,'CoilRegionMeshSize',-1, ...
-    'ShoeGapRegionMeshSize',-1);
-meshOptions.NPositions=2;
-meshOptions.DrawCoilInsulation=drawInsulation;
-meshOptions.AreaOnly=true;
-r=runLegacyRawMagneticSweep(machine,meshOptions);
+r=runBoundedRadialSlotAreaOracle(machine,drawInsulation);
 d=machine.toLegacyStruct();
 if strcmp(position,'external')
     side='i'; roffset=d.Rmo+d.g+d.tc(1)+d.tsb+d.ty/2;
@@ -26,6 +16,8 @@ g=radialslotregions(d.thetac,d.thetasg,d.ty,d.tc(1),d.tsb,d.tsg, ...
     'DrawCoilInsulation',drawInsulation, ...
     'CoilInsulationThickness',d.CoilInsulationThickness);
 assertEqual(r.DrawCoilInsulation,drawInsulation);
+assertElementsAlmostEqual(r.PhysicalGeometry.Nodes,g.Nodes,'absolute',2e-15);
+assertEqual({r.PhysicalGeometry.Edges.Type},{g.Edges.Type});
 assertEqual(numel(r.CoilAreas),numel(g.LayerPackAreas));
 % This tolerance covers FEMM boundary-mesh discretization while remaining
 % well below the geometry mismatch that this oracle is intended to detect.

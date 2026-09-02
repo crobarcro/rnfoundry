@@ -1,8 +1,8 @@
 function success = run_fea_tests(moxunitRoot,reportFile,testTarget)
 %RUN_FEA_TESTS Opt-in real xfemm parity tier; never called by Tier-1 CI.
-%   TESTTARGET optionally selects one test file or directory. The default is
-%   the complete Tier-2 tree. CI uses this only to run that tree in isolated
-%   MATLAB processes so native solver memory is returned between fixtures.
+%   TESTTARGET optionally selects one test file or directory; by default the
+%   complete Tier-2 tree is run. The Issue #5A workflow supplies individual
+%   area-oracle files so each executes in a separate MATLAB process.
 if nargin < 1, moxunitRoot=''; end
 paths=setup_test_paths(moxunitRoot);
 optedIn=strcmp(getenv('RNFOUNDRY_RUN_FEA_TESTS'),'1');

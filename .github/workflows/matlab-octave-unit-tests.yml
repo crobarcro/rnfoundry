@@ -146,6 +146,26 @@ jobs:
             fullfile(pwd,'test-results','matlab-fea-area-external-insulated.xml'),
             fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','tests','fea','radial_slotted','test_radial_slot_region_area_external_insulated.m'));
             if isempty(success), error('rnfoundry:test:FEATestsUnavailable','Required MATLAB XFEMM tests did not execute.'); end
+      - name: Run bounded internal uninsulated slot-area FEA parity
+        uses: matlab-actions/run-command@v3
+        with:
+          command: >-
+            addpath(fullfile(pwd,'.ci-tools','xfemm','mfemm')); mfemm_setup('SessionOnly',true);
+            addpath(fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','ci'));
+            success=run_fea_tests(fullfile(pwd,'.ci-tools','MOxUnit'),
+            fullfile(pwd,'test-results','matlab-fea-area-internal-uninsulated.xml'),
+            fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','tests','fea','radial_slotted','test_radial_slot_region_area_internal_uninsulated.m'));
+            if isempty(success), error('rnfoundry:test:FEATestsUnavailable','Required MATLAB XFEMM tests did not execute.'); end
+      - name: Run bounded internal insulated slot-area FEA parity
+        uses: matlab-actions/run-command@v3
+        with:
+          command: >-
+            addpath(fullfile(pwd,'.ci-tools','xfemm','mfemm')); mfemm_setup('SessionOnly',true);
+            addpath(fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','ci'));
+            success=run_fea_tests(fullfile(pwd,'.ci-tools','MOxUnit'),
+            fullfile(pwd,'test-results','matlab-fea-area-internal-insulated.xml'),
+            fullfile(pwd,'${{ env.TOOLBOX_ROOT }}','tests','fea','radial_slotted','test_radial_slot_region_area_internal_insulated.m'));
+            if isempty(success), error('rnfoundry:test:FEATestsUnavailable','Required MATLAB XFEMM tests did not execute.'); end
       - name: Upload FEA JUnit report
         if: always()
         uses: actions/upload-artifact@v4
