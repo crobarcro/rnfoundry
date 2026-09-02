@@ -31,7 +31,14 @@ function [ RawTorque, ...
 %
 %  simoptions - simulation parameters structure
 %
-%  theta -
+%  theta - angular machine position in radians.
+%
+% Optional inputs include:
+%
+%  'DrawCoilInsulation' - true/false drawing-mode flag controlling whether
+%    explicit coil-insulation regions are included in the FEMM geometry.
+%    Defaults to false. A nonzero design.CoilInsulationThickness does not by
+%    itself enable explicit insulation drawing.
 
 
     Inputs.IsInitialisation = false;
@@ -43,6 +50,7 @@ function [ RawTorque, ...
     Inputs.FemFileName = [tempname, '_simfun_RADIAL_SLOTTED.fem'];
     Inputs.FemmSession = [];
     Inputs.SolveMethod = 'xfemm_legacy';
+    Inputs.DrawCoilInsulation = false;
 
     Inputs = parse_pv_pairs (Inputs, varargin);
 
@@ -106,6 +114,7 @@ function [ RawTorque, ...
                             'YokeRegionMeshSize', simoptions.MagFEASim.YokeRegionMeshSize, ...
                             'CoilRegionMeshSize', simoptions.MagFEASim.CoilRegionMeshSize, ...
                             'CoilCurrent', Inputs.PhaseCurrents, ...
+                            'DrawCoilInsulation', Inputs.DrawCoilInsulation, ...
                             'DrawingType', DrawingType);
 
             % write the fem file to disk
@@ -142,6 +151,7 @@ function [ RawTorque, ...
                             'YokeRegionMeshSize', simoptions.MagFEASim.YokeRegionMeshSize, ...
                             'CoilRegionMeshSize', simoptions.MagFEASim.CoilRegionMeshSize, ...
                             'CoilCurrent', Inputs.PhaseCurrents, ...
+                            'DrawCoilInsulation', Inputs.DrawCoilInsulation, ...
                             'DrawingType', DrawingType);
 
                 % write the fem file to disk

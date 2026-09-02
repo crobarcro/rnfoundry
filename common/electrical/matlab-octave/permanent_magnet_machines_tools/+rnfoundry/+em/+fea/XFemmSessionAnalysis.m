@@ -12,7 +12,11 @@ classdef XFemmSessionAnalysis < handle
             if nargin < 2 || isempty(femFileName)
                 femFileName = [tempname(), '_rnfoundry_em.fem'];
             end
-            if exist('xfemm.femmsession','class') ~= 8
+            % EXIST does not reliably resolve package-qualified classes in
+            % GNU Octave and can also report false before MATLAB loads the
+            % class. WHICH is the same portable availability check used by
+            % the Tier-2 runner.
+            if isempty(which('xfemm.femmsession'))
                 error('rnfoundry:em:XFemmUnavailable', ...
                       'xfemm.femmsession is not available on the current path.');
             end

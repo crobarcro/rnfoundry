@@ -9,6 +9,6 @@ d=base.toLegacyStruct();
 d.MagnetPolarisation=polarisation;
 d.MagFEASimMaterials=struct('Magnet','NdFeB 40 MGOe', ...
     'FieldBackIron','1117 Steel','ArmatureYoke','1117 Steel', ...
-    'ArmatureCoil','36 AWG');
+    'ArmatureCoil','36 AWG','CoilInsulation','Air');
 machine=rnfoundry.em.rotary.radial.SlottedPMMachine.fromLegacyStruct(d);
 end

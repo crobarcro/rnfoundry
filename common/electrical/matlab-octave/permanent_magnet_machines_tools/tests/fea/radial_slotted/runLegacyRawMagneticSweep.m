@@ -1,21 +1,32 @@
 function result=runLegacyRawMagneticSweep(machine,options)
 %RUNLEGACYRAWMAGNETICSWEEP Established feasim femmsession oracle for tests.
+if ~isfield(options,'DrawCoilInsulation'), options.DrawCoilInsulation=false; end
+% The area oracle needs one solved position, but the public sweep option
+% contract deliberately requires NPositions >= 2. AreaOnly is a test-helper
+% concern applied after resolving that public contract.
+if ~isfield(options,'AreaOnly'), options.AreaOnly=false; end
+drawCoilInsulation=options.DrawCoilInsulation; areaOnly=options.AreaOnly;
+options=rmfield(options,{'DrawCoilInsulation','AreaOnly'});
 o=rnfoundry.em.rotary.radial.resolveMagneticSweepOptions(machine,options);
 d=machine.toLegacyStruct(); d.MagFEASimMaterials.AirGap=o.AirGapMaterial;
+% Explicit insulation is a drawing-mode fixture concern and is not retained
+% by the current canonical material model.
+if drawCoilInsulation, d.MagFEASimMaterials.CoilInsulation='Air'; end
 d.FirstSlotCenter=0; d.MagFEASimPositions=linspace(0,1,o.NPositions);
+if areaOnly, d.MagFEASimPositions=d.MagFEASimPositions(1); end
 simoptions=struct('DoBackIronCoreLoss',false,'MagFEASim',struct( ...
     'MagnetRegionMeshSize',o.MagnetRegionMeshSize, ...
     'BackIronRegionMeshSize',o.BackIronRegionMeshSize, ...
     'AirGapMeshSize',o.AirGapMeshSize,'OuterRegionsMeshSize',o.OuterRegionsMeshSize, ...
     'YokeRegionMeshSize',o.YokeRegionMeshSize,'CoilRegionMeshSize',o.CoilRegionMeshSize, ...
     'ShoeGapRegionMeshSize',o.ShoeGapRegionMeshSize));
-np=max(1,ceil(d.pb/2)); n=o.NPositions; session=[];
+np=max(1,ceil(d.pb/2)); n=o.NPositions; if areaOnly, n=1; end; session=[];
 for k=1:n
     extra={}; if k>1, extra={'FemmSession',session}; end
     [torque(k,1),~,~,tooth(k,1),flux,apos,aint,bpos,bint,d,session]= ...
         feasim_RADIAL_SLOTTED(d,simoptions,machine.thetap*d.MagFEASimPositions(k), ...
         'NPolePairs',np,'RotationMethod','SlidingMesh','SolveMethod','femmsession', ...
-        'GatherIronLossData',false,'PhaseCurrents',zeros(machine.Armature.Winding.PhaseCount,1), ...
+        'GatherIronLossData',false,'DrawCoilInsulation',drawCoilInsulation,'PhaseCurrents',zeros(machine.Armature.Winding.PhaseCount,1), ...
         extra{:}); %#ok<AGROW>
     direct(k,:)=flux; aPosition(k,:)=apos(:).'; bPosition(k,:)=bpos(:).'; %#ok<AGROW>
     aIntegral(k,:,:,:)=reshape(aint,[1,size(aint,1),size(aint,2),size(aint,3)]); %#ok<AGROW>
@@ -23,7 +34,11 @@ for k=1:n
     airGap(k,:)=d.FluxDensityMagnitudeAirGap; %#ok<AGROW>
     if k==1
         labels=d.StatorDrawingInfo.CoilLabelLocations;
-        coilArea=session.blockintegral(5,labels(1,1),labels(1,2));
+        coilAreas=zeros(d.CoilLayers,1);
+        for layer=1:d.CoilLayers
+            coilAreas(layer)=session.blockintegral(5,labels(layer,1),labels(layer,2));
+        end
+        coilArea=coilAreas(1);
         session.clearblock(); session.groupselectblock(d.FemmProblem.Groups.ArmatureBackIron);
         ironArea=session.blockintegral(5)/d.StatorDrawingInfo.NDrawnSlots*d.Qs;
         session.clearblock(); session.groupselectblock( ...
@@ -39,6 +54,6 @@ result=struct('Positions',d.MagFEASimPositions(:),'PhysicalAngles', ...
     'DirectFluxLinkage',direct,'ToothFluxDensity',tooth, ...
     'SlotVectorPotential',struct('Position',aPosition,'Integral',aIntegral), ...
     'SlotFlux',struct('Position',bPosition,'Integral',bIntegral), ...
-    'AirGapField',struct('Magnitude',airGap),'CoilArea',coilArea, ...
-    'ArmatureIronArea',ironArea,'PerPoleRadialForce',radialForce);
+    'AirGapField',struct('Magnitude',airGap),'CoilArea',coilArea,'CoilAreas',coilAreas, ...
+    'DrawCoilInsulation',drawCoilInsulation,'ArmatureIronArea',ironArea,'PerPoleRadialForce',radialForce);
 end
