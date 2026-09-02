@@ -24,11 +24,11 @@ geom.LegacyLocalNodes=geom.LocalNodes; geom.LegacyLocalCoilLabelLocations=geom.L
 if opts.DrawCoilInsulation && opts.NWindingLayers>1 && ~opts.SplitSlot && strcmp(opts.LayerPartitionMode,'equal-physical-area')
     plain=varargin;
     for kk=9:2:numel(plain), if strcmp(plain{kk},'DrawCoilInsulation'), plain{kk+1}=false; end; end
-    unins=radialslotgeometry(plain{:}); ua=analyzeRadialSlotRegions(unins); ia=analyzeRadialSlotRegions(geom);
+    unins=radialslotgeometry(plain{:}); ua=radialslotknownareas(unins); ia=radialslotknownareas(geom);
     ur=sort([unins.Edges(ua.PartitionEdgeIds).Radius]); ids=ia.PartitionEdgeIds; ir=[geom.Edges(ids).Radius]; [~,io]=sort(ir);
     geom.PartitionEdgeIds=ids; geom.CoilRadialBounds=unins.CoilRadialBounds;
     for kk=1:numel(ids), [geom,ok]=candidateAtRadius(geom,ids(io(kk)),ur(kk)); if ~ok, error('rnfoundry:geometry:NoSafePartition','Insulation boundary cannot accept frozen divider.'); end; end
-    final=analyzeRadialSlotRegions(geom); diag=unins.PartitionDiagnostics; diag.AchievedRegionAreas=final.LayerPackAreas; diag.RelativeAreaImbalance=(max(final.LayerPackAreas)-min(final.LayerPackAreas))/mean(final.LayerPackAreas); diag.PartitionPositions=ur; geom.PartitionDiagnostics=diag; return;
+    final=radialslotknownareas(geom); diag=unins.PartitionDiagnostics; diag.AchievedRegionAreas=final.LayerPackAreas; diag.RelativeAreaImbalance=(max(final.LayerPackAreas)-min(final.LayerPackAreas))/mean(final.LayerPackAreas); diag.PartitionPositions=ur; geom.PartitionDiagnostics=diag; return;
 end
 if opts.SplitSlot
     mode='split-slot';
@@ -46,14 +46,14 @@ else
     error('rnfoundry:geometry:InvalidPartitionMode', ...
           'LayerPartitionMode must be equal-physical-area or legacy-local.');
 end
-analyzed=analyzeRadialSlotRegions(geom);
+analyzed=radialslotknownareas(geom);
 geom.PartitionDiagnostics=makeDiagnostics(mode,analyzed.LayerPackAreas,[],0,false,'',{});
 end
 
 function [geom,diag]=equalRadialPartitions(geom,opts)
 % The topology is supplied by the Cartesian construction, but its divider
 % radii are replaced using bounded bisection on exact line/arc face areas.
-a=analyzeRadialSlotRegions(geom); ids=a.PartitionEdgeIds; geom.PartitionEdgeIds=ids;
+a=radialslotknownareas(geom); ids=a.PartitionEdgeIds; geom.PartitionEdgeIds=ids;
 if numel(ids)~=numel(a.LayerPackAreas)-1
     error('rnfoundry:geometry:InvalidPartitionTopology','Expected one divider between adjacent radial layers.');
 end
@@ -65,7 +65,7 @@ labelr=sqrt(sum(geom.CoilLabelLocations.^2,2)); [labelr,ord]=sort(labelr);
 if numel(labelr)>1, gap=median(diff(labelr)); else, gap=max(rall)-min(rall); end
 geom.CoilRadialBounds=[labelr(1)-gap/2,labelr(end)+gap/2];
 total=sum(a.LayerPackAreas); targets=(1:numel(ids))'*total/(numel(ids)+1);
-positions=zeros(numel(ids),1); iterations=zeros(numel(ids),1); adjusted=false; reasons={}; snapped={};
+positions=zeros(numel(ids),1); idealPositions=zeros(numel(ids),1); iterations=zeros(numel(ids),1); adjusted=false; reasons={}; snapped={};
 partitionR=zeros(numel(ids),1);
 for q=1:numel(ids), partitionR(q)=mean(sqrt(sum(geom.Nodes(geom.Edges(ids(q)).NodeIds,:).^2,2))); end
 [partitionR,edgeOrder]=sort(partitionR);
@@ -81,6 +81,7 @@ for q=1:numel(ids)
     lo=max(ranges(:,1))+feature; hi=min(ranges(:,2))-feature;
     if q>1, lo=max(lo,positions(q-1)+feature); end
     if q<numel(ids), hi=min(hi,partitionR(q+1)-feature); end
+    safeLo=lo; safeHi=hi;
     [glo,oklo]=candidateAtRadius(geom,edgeId,lo); [ghi,okhi]=candidateAtRadius(geom,edgeId,hi);
     if ~(oklo&&okhi), error('rnfoundry:geometry:NoSafePartition','No valid divider bracket exists.'); end
     flo=cumulativeArea(glo,ord,q)-target; fhi=cumulativeArea(ghi,ord,q)-target;
@@ -92,16 +93,43 @@ for q=1:numel(ids)
         if abs(fm)<=opts.PartitionAreaTolerance*total, break; end
         if flo*fm<=0, hi=mid; fhi=fm; else, lo=mid; flo=fm; end %#ok<NASGU>
     end
+    idealPositions(q)=mid;
+    clearance=partitionClearance(gm,edgeId);
+    if clearance<feature || clearance<snap
+        steps=feature*[1 2 4 8 16]; candidates=reshape([mid-steps;mid+steps],1,[]); best=[]; besterr=Inf; bestpos=NaN;
+        for cc=1:numel(candidates)
+            if candidates(cc)<=safeLo || candidates(cc)>=safeHi, continue; end
+            [gc,ok]=candidateAtRadius(geom,edgeId,candidates(cc));
+            if ok && partitionClearance(gc,edgeId)>=feature
+                err=abs(cumulativeArea(gc,ord,q)-target);
+                if err<besterr, best=gc; besterr=err; bestpos=candidates(cc); end
+            end
+        end
+        if isempty(best), error('rnfoundry:geometry:NoSafePartition','No topology-safe divider placement exists in the valid bracket.'); end
+        gm=best; mid=bestpos; adjusted=true;
+        reasons{end+1}='ideal divider was inside the physical feature-clearance band'; %#ok<AGROW>
+        snapped{end+1}='nearest safe chord location'; %#ok<AGROW>
+    end
     positions(q)=mid; iterations(q)=it; geom=gm;
 end
-final=analyzeRadialSlotRegions(geom); achieved=final.LayerPackAreas;
+final=radialslotknownareas(geom); achieved=final.LayerPackAreas;
 diag=makeDiagnostics('equal-physical-area',achieved,targets,iterations,adjusted,strjoin(reasons,'; '),snapped);
-diag.PartitionPositions=positions; diag.MinimumNodeSeparation=geom.MinimumNodeSeparation;
+diag.IdealPartitionPositions=idealPositions; diag.PartitionPositions=positions; diag.MinimumNodeSeparation=geom.MinimumNodeSeparation;
 diag.MinimumStraightEdgeLength=geom.MinimumStraightSegmentLength;
 diag.MinimumArcLength=geom.MinimumArcLength; diag.MinimumDividerSpacing=minimumDiff(positions);
 end
 function value=cumulativeArea(g,ord,q)
-a=analyzeRadialSlotRegions(g); value=sum(a.LayerPackAreas(ord(1:q)));
+a=radialslotknownareas(g); value=sum(a.LayerPackAreas(ord(1:q)));
+end
+function value=partitionClearance(g,eid)
+value=Inf; ids=g.Edges(eid).NodeIds;
+for zz=1:2
+ row=find(g.BoundaryChordAttachments(:,1)==ids(zz),1);
+ if isempty(row), value=0; return; end
+ pair=g.BoundaryChordAttachments(row,2:3); p=g.AuthoritativeBoundaryNodes(pair,:);
+ value=min(value,min(sqrt(sum((p-g.Nodes(ids(zz),:)).^2,2))));
+end
+value=min(value,g.Edges(eid).Length);
 end
 function [g,ok]=candidateAtRadius(g,eid,r)
 ids=g.Edges(eid).NodeIds; ok=true;
@@ -155,7 +183,7 @@ g.MinimumArcLength=minOrInf(ll(strcmp({g.Edges.Type},'arc')));
 end
 function d=makeDiagnostics(mode,areas,targets,it,adjusted,reason,snapped)
 d=struct('PartitionMode',mode,'TargetRegionAreas',targets,'AchievedRegionAreas',areas, ...
- 'RelativeAreaImbalance',(max(areas)-min(areas))/mean(areas),'PartitionPositions',[], ...
+ 'RelativeAreaImbalance',(max(areas)-min(areas))/mean(areas),'IdealPartitionPositions',[],'PartitionPositions',[], ...
  'Iterations',it,'Adjusted',adjusted,'AdjustmentReason',reason,'SnappedFeature',{snapped}, ...
  'MinimumNodeSeparation',NaN,'MinimumStraightEdgeLength',NaN,'MinimumArcLength',NaN,'MinimumDividerSpacing',Inf);
 end

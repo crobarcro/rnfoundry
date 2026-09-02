@@ -34,3 +34,9 @@ The Cartesian `internalslotnodelinks` algorithm is unchanged. FEMM
 Legacy `CoilArea`/`PackArea` build inputs are accepted as deprecated ignored inputs
 and cannot override exact geometry. Issue #5C remains: magnetic preparation still
 consumes raw FEA coil-area diagnostics and is intentionally unchanged here.
+
+Construction uses `radialslotknownareas` rather than the public
+`analyzeRadialSlotRegions` entry point, and both evaluators share `greenareaedge`
+for exact line and general circular-arc Green contributions. The construction-side
+evaluator is private to the known radial-slot graph contract; `radialslotregions`
+still invokes the public analyzer independently after construction.

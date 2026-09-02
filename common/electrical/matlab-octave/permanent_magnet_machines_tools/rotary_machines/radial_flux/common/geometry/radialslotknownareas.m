@@ -1,5 +1,6 @@
-function geom=analyzeRadialSlotRegions(geom)
-%ANALYZERADIALSLOTREGIONS Trace, validate, label, and integrate slot faces.
+function geom=radialslotknownareas(geom)
+%RADIALSLOTKNOWNAREAS Exact area evaluation for constructed radial-slot graphs.
+% Construction-private evaluator; deliberately independent of the public analyzer.
 faces=traceFaces(geom.Nodes,geom.Edges);
 labels=geom.CoilLabelLocations;
 regions=repmat(struct('LabelIndex',0,'FaceIndex',0,'BoundaryEdgeIds',[], ...

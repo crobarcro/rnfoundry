@@ -147,7 +147,7 @@ for k=1:size(cases,1)
     assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-3);
     assertTrue(g.MinimumPartitionEdgeLength>4e-2);
 end
-g=fixture('o',3,false,true);
+g=fixtureMode('o',3,false,true,'legacy-local');
 assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-2);
 assertTrue(g.MinimumPartitionEdgeLength>4e-2);
 end
@@ -210,4 +210,22 @@ for id=g.PartitionEdgeIds
         assertTrue(min(d)<tol);
     end
 end
+end
+
+function test_equal_area_adjustment_diagnostics_are_real()
+args={[.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
+    'NWindingLayers',2,'MinimumPhysicalFeature',2e-6,'PartitionSnapTolerance',.1};
+g=radialslotregions(args{:}); h=radialslotregions(args{:});
+assertTrue(g.PartitionDiagnostics.Adjusted);
+assertTrue(~isempty(g.PartitionDiagnostics.AdjustmentReason));
+assertTrue(~isempty(g.PartitionDiagnostics.SnappedFeature));
+assertTrue(isfinite(g.PartitionDiagnostics.RelativeAreaImbalance));
+assertTrue(g.PartitionDiagnostics.RelativeAreaImbalance<2e-4);
+assertTrue(g.MinimumNodeSeparation>=2e-6);
+assertEqual(g.Nodes,h.Nodes); assertEqual(g.PartitionDiagnostics,h.PartitionDiagnostics);
+end
+
+function test_equal_area_higher_layers_fail_explicitly()
+assertExceptionThrown(@() radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
+    'NWindingLayers',3),'rnfoundry:geometry:UnsupportedLayerCount');
 end
