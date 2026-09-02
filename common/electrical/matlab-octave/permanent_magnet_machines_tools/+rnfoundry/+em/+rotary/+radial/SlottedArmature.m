@@ -18,6 +18,7 @@ classdef SlottedArmature
         thetacy
         IronMaterial
         Winding
+        ShoeCurveControlFrac
     end
     properties (Dependent)
         ty
@@ -35,7 +36,7 @@ classdef SlottedArmature
     methods
         function obj = SlottedArmature(s)
             names = {'Position','Ryi','Ryo','Rtsb','Rtsg','Ra','tc','tcb', ...
-                     'thetasg','thetacg','thetacy','IronMaterial','Winding'};
+                     'thetasg','thetacg','thetacy','IronMaterial','Winding','ShoeCurveControlFrac'};
             for k = 1:numel(names)
                 if ~isfield(s,names{k})
                     error('rnfoundry:em:MissingArmatureProperty','Missing armature property %s.',names{k});
@@ -72,12 +73,15 @@ classdef SlottedArmature
                 error('rnfoundry:em:InvalidPosition','Position must be internal or external.');
             end
             values = [obj.Ryi,obj.Ryo,obj.Rtsb,obj.Rtsg,obj.Ra,obj.tc,obj.tcb, ...
-                      obj.thetasg,obj.thetacg,obj.thetacy];
+                      obj.thetasg,obj.thetacg,obj.thetacy,obj.ShoeCurveControlFrac];
             if any(~isfinite(values)) || any(values(1:6) <= 0) || obj.tcb < 0
                 error('rnfoundry:em:InvalidArmatureGeometry','Armature geometry is not positive and finite.');
             end
             if ~(obj.Ryi < obj.Ryo) || obj.tcb > obj.tc
                 error('rnfoundry:em:InvalidSlotGeometry','Yoke or tc/tcb geometry is invalid.');
+            end
+            if ~(obj.ShoeCurveControlFrac>=0 && obj.ShoeCurveControlFrac<=1)
+                error('rnfoundry:em:InvalidSlotGeometry','ShoeCurveControlFrac must be in [0,1].');
             end
             if ~(obj.thetasg >= 0 && obj.thetasg < obj.thetacg ...
                     && obj.thetacg <= obj.thetas ...
@@ -105,6 +109,7 @@ classdef SlottedArmature
                 'Ryi',obj.Ryi,'Ryo',obj.Ryo,'Rtsb',obj.Rtsb,'Rtsg',obj.Rtsg, ...
                 'Ra',obj.Ra,'tc',obj.tc,'tcb',obj.tcb,'thetasg',obj.thetasg, ...
                 'thetacg',obj.thetacg,'thetacy',obj.thetacy, ...
+                'ShoeCurveControlFrac',obj.ShoeCurveControlFrac, ...
                 'IronMaterial',obj.IronMaterial,'Winding',obj.Winding.toStruct());
         end
     end
@@ -113,6 +118,7 @@ classdef SlottedArmature
             rnfoundry.em.validateStructEnvelope( ...
                 s, 'rnfoundry.em.rotary.radial.SlottedArmature', 'SlottedArmature');
             armatureStruct = s;
+            if ~isfield(armatureStruct,'ShoeCurveControlFrac'), armatureStruct.ShoeCurveControlFrac=0.5; end
             armatureStruct.Winding = rnfoundry.em.winding.Winding.fromStruct(s.Winding);
             obj = rnfoundry.em.rotary.radial.SlottedArmature(armatureStruct);
         end

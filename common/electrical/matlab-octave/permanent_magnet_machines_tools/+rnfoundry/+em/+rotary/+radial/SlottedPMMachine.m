@@ -4,7 +4,7 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
     %   g, Rgm, tausm and ratios are derived. Factories accept legacy ratio,
     %   radius, thickness, or completed-struct forms. Public construction is
     %   fromRatios, fromRadii, fromThicknesses, or fromLegacyStruct.
-    %   CoilArea/PackArea must be explicit; no slot-area approximation is used.
+    %   Exact per-layer pack areas are derived from authoritative slot geometry.
     %   A resolved WindingLayout may be supplied; otherwise windinglayout and
     %   mexmPhaseWL are used, and construction fails clearly if unavailable.
     %   Scalar legacy tc resolves tcb=0.05*tc, matching legacy FEA geometry.
@@ -115,7 +115,7 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
             d.tc=[a.tc,a.tcb]; d.tc2Vtc1=a.tcbVtc; d.ty=a.ty; d.tsb=a.tsb; d.tsg=a.tsg;
             if strcmp(a.Position,'external'), d.Rai=a.Ra; else, d.Rao=a.Ra; end
             d.thetas=a.thetas; d.thetasg=a.thetasg; d.thetacg=a.thetacg;
-            d.thetacy=a.thetacy; d.thetac=a.thetac; d.thetap=obj.thetap;
+            d.thetacy=a.thetacy; d.thetac=a.thetac; d.ShoeCurveControlFrac=a.ShoeCurveControlFrac; d.thetap=obj.thetap;
             d.PoleWidth=obj.PoleSpan; d.g=obj.g; d.ls=obj.ls; d.Rgm=obj.Rgm;
             d.tausm=obj.tausm; d.NStages=obj.NStages; d.tm=f.MagnetThickness;
             d.tbi=f.BackIronThickness; d.thetamVthetap=f.thetam/obj.thetap;
@@ -154,10 +154,6 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
                 d = completedesign_RADIAL_SLOTTED(d,struct(),'firstcomplete');
             end
             d = rnfoundry.em.rotary.radial.SlottedPMMachine.defaults(d);
-            if ~isfield(d,'CoilArea')
-                error('rnfoundry:em:MissingPackArea', ...
-                      'CoilArea/PackArea is required; it cannot be inferred exactly without slot-region integration.');
-            end
             if ~isfield(d.WindingLayout,'Coils') || ~isfield(d.WindingLayout,'Phases') ...
                     || isempty(d.WindingLayout.Coils) || isempty(d.WindingLayout.Phases)
                 error('rnfoundry:em:UnresolvedWindingLayout', ...
@@ -169,8 +165,20 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
             for k=1:numel(names), if isfield(d,names{k}), packingSpec.(names{k})=d.(names{k}); end; end
             pitchLength = d.yd*d.thetas*d.Rcm + d.thetas*d.Rcm/2;
             slotWidth = mean([d.thetacg,d.thetacy])*d.Rcm;
+            if strncmpi(d.ArmatureType,'external',1)
+                side='i'; roffset=d.Rmo+d.g+d.tc(1)+d.tsb+d.ty/2;
+            else
+                side='o'; roffset=d.Rmi-d.g-d.tc(1)-d.tsb-d.ty/2;
+            end
+            basefrac=.05; if numel(d.tc)>1, basefrac=d.tc(2)/d.tc(1); end
+            split=(d.CoilLayers==2 && d.yd==1);
+            exact=radialslotregions(d.thetac,d.thetasg,d.ty,d.tc(1),d.tsb,d.tsg,roffset,side, ...
+                'NWindingLayers',d.CoilLayers,'CoilBaseFraction',basefrac, ...
+                'ShoeCurveControlFrac',d.ShoeCurveControlFrac,'SplitSlot',split, ...
+                'DrawCoilInsulation',d.CoilInsulationThickness>0, ...
+                'CoilInsulationThickness',d.CoilInsulationThickness);
             geometry = rnfoundry.em.winding.RadialSlottedCoilGeometry( ...
-                d.CoilArea,d.ls,pitchLength,slotWidth,2*d.ls,d.CoilInsulationThickness);
+                exact.LayerPackAreas,d.ls,pitchLength,slotWidth,2*d.ls,d.CoilInsulationThickness);
             packing = rnfoundry.em.winding.resolvePacking(packingSpec,geometry);
             ws = struct('PhaseCount',d.Phases,'PoleCount',d.Poles(1), ...
                 'LayerCount',d.CoilLayers,'CoilCount',d.Qc,'BasicCoilCount',d.Qcb, ...
@@ -197,6 +205,7 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
                 'Position',position,'Ryi',d.Ryi,'Ryo',d.Ryo,'Rtsb',d.Rtsb, ...
                 'Rtsg',d.Rtsg,'Ra',ra,'tc',tc,'tcb',tcb,'thetasg',d.thetasg, ...
                 'thetacg',d.thetacg,'thetacy',d.thetacy, ...
+                'ShoeCurveControlFrac',d.ShoeCurveControlFrac, ...
                 'IronMaterial',rnfoundry.em.rotary.radial.SlottedPMMachine.material(d,'ArmatureYoke'), ...
                 'Winding',winding));
             field = rnfoundry.em.rotary.radial.RadialPMField(struct( ...
@@ -222,7 +231,7 @@ classdef SlottedPMMachine < rnfoundry.em.RotaryMachine
         function d = defaults(d)
             defaults = {'MagnetSkew',0;'MagnetPolarisation','constant'; ...
                         'CoilLayers',1;'CoilInsulationThickness',0; ...
-                        'NStrands',1;'NStages',1;'Branches',1};
+                        'NStrands',1;'NStages',1;'Branches',1;'ShoeCurveControlFrac',0.5};
             for k=1:size(defaults,1), if ~isfield(d,defaults{k,1}), d.(defaults{k,1})=defaults{k,2}; end; end
             if isfield(d,'NCoilsPerPhase') && ~isfield(d,'CoilsPerBranch')
                 d.CoilsPerBranch=d.NCoilsPerPhase/d.Branches;
