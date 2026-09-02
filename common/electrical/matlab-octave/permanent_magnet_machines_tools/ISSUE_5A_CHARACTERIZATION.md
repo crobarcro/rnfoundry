@@ -141,13 +141,17 @@ R2024b, matching XFEMM's supported MEX compiler pairing. It checks out
 `crobarcro/xfemm` without a ref (latest default development branch, deliberately
 unpinned), prints the exact checkout SHA, builds only the session interfaces via
 `mfemm_setup(..., 'SessionOnly', true)`, runs `Test_femmsession`, and then runs
-the complete `tests/fea` tree. Each FEA test file, and each slot-area drawing
-mode, runs in a fresh MATLAB process. This preserves complete coverage while
-returning XFEMM's native mesh and solver memory between fixtures; the previous
-single-process run exhausted the hosted runner after approximately six minutes
-and caused it to lose communication with Actions. An unavailable native runtime
-is an Actions failure rather than a successful skip. The separate JUnit files
-are uploaded together as the MATLAB FEA artifact. The current upstream revision
+the external uninsulated and insulated Issue #5A area-oracle fixtures in fresh
+MATLAB processes. The broader raw-sweep and gap-force Tier-2 tests remain
+available through `run_fea_tests` for opt-in local testing, but are excluded
+from this focused gate: they exercise unrelated solver parity and made failures
+outside the radial-slot-area work prevent the oracle from running. The current
+development mesher also refines the existing full-machine internal fixture
+pathologically (more than 8 GiB locally), so its committed internal area cases
+remain opt-in pending a bounded internal FEA fixture. Internal orientation is
+still covered by the pure Tier-1 geometry tests. An unavailable native runtime
+is an Actions failure rather than a successful skip. Separate JUnit files are
+uploaded together as the MATLAB FEA artifact. The current upstream revision
 inspected while preparing this workflow was
 `b4ab66acdfc382ae7c75e20cf8a2e40ac3533319`;
 the authoritative tested SHA is always the value printed by the successful
@@ -157,6 +161,15 @@ Each coil-region oracle comparison prints analytic area, FEMM block-integral
 area, and relative error. The `0.1%` tolerance remains provisional until the new
 job produces its first native results; no successful native result or mesh-
 refinement observation is claimed by this document before that run completes.
+
+The first process-isolated rerun did not exhaust its runner: it failed after
+the external legacy sweep completed because the modern session owner checked a
+package-qualified class with `exist(..., 'class')`. That check can return false
+even when `which('xfemm.femmsession')` resolves the class and the MEX runtime has
+already passed its probe. The session owner now uses the same portable `which`
+check as the Tier-2 availability gate. This diagnosis also confirmed that the
+gap-force test was not the step which failed, although it is now excluded from
+the focused Issue #5A Actions gate to reduce unrelated native resource use.
 
 The first Actions execution built and probed XFEMM successfully but exposed
 three test-fixture defects before all four comparisons could run: the area-only

@@ -1,8 +1,17 @@
 function assertRadialSlotRegionAreaParity(position,drawInsulation)
 %ASSERTRADIALSLOTREGIONAREAPARITY Compare every exact region with FEMM.
 machine=makeFEASlottedMachine(position);
-r=runLegacyRawMagneticSweep(machine,struct('NPositions',2, ...
-    'DrawCoilInsulation',drawInsulation,'AreaOnly',true));
+% Area parity does not need the production magnetic-sweep refinement. Using
+% FEMM automatic region meshes reduces the oracle's native-memory footprint;
+% the actual line/arc boundary remains unchanged.
+meshOptions=struct('MagnetRegionMeshSize',-1,'BackIronRegionMeshSize',-1, ...
+    'AirGapMeshSize',-1,'OuterRegionsMeshSize',[-1,-1], ...
+    'YokeRegionMeshSize',-1,'CoilRegionMeshSize',-1, ...
+    'ShoeGapRegionMeshSize',-1);
+meshOptions.NPositions=2;
+meshOptions.DrawCoilInsulation=drawInsulation;
+meshOptions.AreaOnly=true;
+r=runLegacyRawMagneticSweep(machine,meshOptions);
 d=machine.toLegacyStruct();
 if strcmp(position,'external')
     side='i'; roffset=d.Rmo+d.g+d.tc(1)+d.tsb+d.ty/2;

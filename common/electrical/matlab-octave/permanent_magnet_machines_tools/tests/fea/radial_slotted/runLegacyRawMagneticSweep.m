@@ -9,6 +9,9 @@ drawCoilInsulation=options.DrawCoilInsulation; areaOnly=options.AreaOnly;
 options=rmfield(options,{'DrawCoilInsulation','AreaOnly'});
 o=rnfoundry.em.rotary.radial.resolveMagneticSweepOptions(machine,options);
 d=machine.toLegacyStruct(); d.MagFEASimMaterials.AirGap=o.AirGapMaterial;
+% Explicit insulation is a drawing-mode fixture concern and is not retained
+% by the current canonical material model.
+if drawCoilInsulation, d.MagFEASimMaterials.CoilInsulation='Air'; end
 d.FirstSlotCenter=0; d.MagFEASimPositions=linspace(0,1,o.NPositions);
 if areaOnly, d.MagFEASimPositions=d.MagFEASimPositions(1); end
 simoptions=struct('DoBackIronCoreLoss',false,'MagFEASim',struct( ...
