@@ -4,7 +4,7 @@ initTestSuite;
 end
 function test_ordinary_radial_layers_have_fixed_external_boundary()
 for side=['o','i']
-    g1=fixture(side,1,false,false); g2=fixture(side,2,false,false); g3=fixture(side,3,false,false);
+    g1=fixture(side,1,false,false); g2=fixture(side,2,false,false); g3=fixtureMode(side,3,false,false,'legacy-local');
     assertScaleEqual(g2.TotalPackArea,g1.TotalPackArea);
     assertScaleEqual(g3.TotalPackArea,g1.TotalPackArea);
     assertBoundaryEqual(g1,g2); assertBoundaryEqual(g1,g3);
@@ -26,7 +26,7 @@ ge=fixture('o',1,false,false); gi=fixture('i',1,false,false);
 assertElementsAlmostEqual(ge.TotalPackArea,.002420372415911237,'absolute',3e-15);
 assertElementsAlmostEqual(gi.TotalPackArea,.002072916254066352,'absolute',3e-15);
 for side=['o','i']
-    g1=fixture(side,1,false,true); g2=fixture(side,2,false,true); g3=fixture(side,3,false,true);
+    g1=fixture(side,1,false,true); g2=fixture(side,2,false,true); g3=fixtureMode(side,3,false,true,'legacy-local');
     assertScaleEqual(g2.TotalPackArea,g1.TotalPackArea);
     assertScaleEqual(g3.TotalPackArea,g1.TotalPackArea);
     assertBoundaryEqual(g1,g2); assertBoundaryEqual(g1,g3);
@@ -41,7 +41,7 @@ assertElementsAlmostEqual(g.LayerPackAreas(1),g.LayerPackAreas(2),'absolute',2e-
 assertScaleEqual(g.TotalPackArea,g1.TotalPackArea);
 end
 function test_primitives_topology_features_and_determinism()
-g=fixture('o',3,false,false); h=fixture('o',3,false,false);
+g=fixtureMode('o',3,false,false,'legacy-local'); h=fixtureMode('o',3,false,false,'legacy-local');
 assertEqual(g.Nodes,h.Nodes); assertEqual(g.LayerPackAreas,h.LayerPackAreas);
 assertTrue(all(isfinite(g.Nodes(:)))); assertTrue(g.MinimumNodeSeparation>0);
 assertTrue(g.MinimumEdgeLength>1e-6); assertTrue(any(strcmp({g.Edges.Type},'arc')));
@@ -84,12 +84,12 @@ for side=['o','i']
         assertElementsAlmostEqual(g.MappedRadialNodes(:,1),.48-g.LocalNodes(:,1),'absolute',2e-15);
     end
     assertEqual(g.SlotInfo.coillabelloc,g.CoilLabelLocations);
-    assertEqual(g.LegacySlotInfo.coillabelloc,g.LocalCoilLabelLocations);
+    assertEqual(g.LegacySlotInfo.coillabelloc,g.LegacyLocalCoilLabelLocations);
 end
 end
 function test_divider_arcs_remain_valid_after_chord_attachment()
 for side=['o','i']
-    g=fixture(side,3,false,false);
+    g=fixtureMode(side,3,false,false,'legacy-local');
     assertEqual(numel(g.PartitionEdgeIds),2);
     for id=g.PartitionEdgeIds
         e=g.Edges(id); p=g.Nodes(e.NodeIds,:); radii=sqrt(sum(p.^2,2));
@@ -101,7 +101,7 @@ end
 end
 function test_every_arc_is_finite_nonzero_and_coradial()
 for side=['o','i']
-    g=fixture(side,3,false,true);
+    g=fixtureMode(side,3,false,true,'legacy-local');
     for id=find(strcmp({g.Edges.Type},'arc'))
         e=g.Edges(id); p=g.Nodes(e.NodeIds,:); r=sqrt(sum((p-e.ArcCenter).^2,2));
         assertTrue(abs(diff(r))<=max(1e-12,1e-10*max(r)));

@@ -41,7 +41,14 @@ classdef RadialSlottedCoilGeometry < rnfoundry.em.winding.CoilGeometry
     end
     methods (Static)
         function obj=fromStruct(s)
-            rnfoundry.em.validateStructEnvelope(s,'rnfoundry.em.winding.CoilGeometry','RadialSlottedCoilGeometry');
+            if ~isstruct(s) || ~isfield(s,'Schema') || ~strcmp(s.Schema,'rnfoundry.em.winding.CoilGeometry') ...
+                    || ~isfield(s,'Type') || ~strcmp(s.Type,'RadialSlottedCoilGeometry') ...
+                    || ~isfield(s,'SchemaVersion') || ~any(s.SchemaVersion==[1 2])
+                error('rnfoundry:em:UnsupportedSchema','Only radial coil geometry schema versions 1 and 2 are supported.');
+            end
+            if s.SchemaVersion==2 && (~isfield(s,'LayerPackAreas') || ~isfield(s,'TotalPackArea') || ~isfield(s,'PackArea'))
+                error('rnfoundry:em:InvalidPersistence','Version 2 radial coil geometry requires all area fields.');
+            end
             if isfield(s,'LayerPackAreas'), areas=s.LayerPackAreas; else, areas=s.PackArea; end
             if isfield(s,'PackArea')&&abs(s.PackArea-min(areas))>1e-12*max(1,abs(s.PackArea)), error('rnfoundry:em:InconsistentPackArea','Serialized PackArea disagrees with LayerPackAreas.'); end
             if isfield(s,'TotalPackArea')&&abs(s.TotalPackArea-sum(areas))>1e-12*max(1,abs(s.TotalPackArea)), error('rnfoundry:em:InconsistentPackArea','Serialized TotalPackArea disagrees with LayerPackAreas.'); end

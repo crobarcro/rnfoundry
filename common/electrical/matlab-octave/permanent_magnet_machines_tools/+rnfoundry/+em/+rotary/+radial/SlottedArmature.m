@@ -35,6 +35,7 @@ classdef SlottedArmature
     end
     methods
         function obj = SlottedArmature(s)
+            if ~isfield(s,'ShoeCurveControlFrac'), s.ShoeCurveControlFrac=0.5; end
             names = {'Position','Ryi','Ryo','Rtsb','Rtsg','Ra','tc','tcb', ...
                      'thetasg','thetacg','thetacy','IronMaterial','Winding','ShoeCurveControlFrac'};
             for k = 1:numel(names)

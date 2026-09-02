@@ -20,12 +20,13 @@ for j=1:numel(remove)
     end
 end
 geom=radialslotgeometrylegacy(legacyArgs{:});
+geom.LegacyLocalNodes=geom.LocalNodes; geom.LegacyLocalCoilLabelLocations=geom.LocalCoilLabelLocations;
 if opts.DrawCoilInsulation && opts.NWindingLayers>1 && ~opts.SplitSlot && strcmp(opts.LayerPartitionMode,'equal-physical-area')
     plain=varargin;
     for kk=9:2:numel(plain), if strcmp(plain{kk},'DrawCoilInsulation'), plain{kk+1}=false; end; end
     unins=radialslotgeometry(plain{:}); ua=analyzeRadialSlotRegions(unins); ia=analyzeRadialSlotRegions(geom);
     ur=sort([unins.Edges(ua.PartitionEdgeIds).Radius]); ids=ia.PartitionEdgeIds; ir=[geom.Edges(ids).Radius]; [~,io]=sort(ir);
-    geom.PartitionEdgeIds=ids;
+    geom.PartitionEdgeIds=ids; geom.CoilRadialBounds=unins.CoilRadialBounds;
     for kk=1:numel(ids), [geom,ok]=candidateAtRadius(geom,ids(io(kk)),ur(kk)); if ~ok, error('rnfoundry:geometry:NoSafePartition','Insulation boundary cannot accept frozen divider.'); end; end
     final=analyzeRadialSlotRegions(geom); diag=unins.PartitionDiagnostics; diag.AchievedRegionAreas=final.LayerPackAreas; diag.RelativeAreaImbalance=(max(final.LayerPackAreas)-min(final.LayerPackAreas))/mean(final.LayerPackAreas); diag.PartitionPositions=ur; geom.PartitionDiagnostics=diag; return;
 end
@@ -40,7 +41,7 @@ elseif strcmp(opts.LayerPartitionMode,'equal-physical-area') && opts.NWindingLay
     geom.PartitionDiagnostics=diag;
     return;
 elseif strcmp(opts.LayerPartitionMode,'equal-physical-area')
-    mode='legacy-local-higher-layer-fallback';
+    error('rnfoundry:geometry:UnsupportedLayerCount','Equal physical area currently supports exactly two ordinary layers.');
 else
     error('rnfoundry:geometry:InvalidPartitionMode', ...
           'LayerPartitionMode must be equal-physical-area or legacy-local.');
@@ -57,10 +58,12 @@ if numel(ids)~=numel(a.LayerPackAreas)-1
     error('rnfoundry:geometry:InvalidPartitionTopology','Expected one divider between adjacent radial layers.');
 end
 rall=sqrt(sum(geom.AuthoritativeBoundaryNodes.^2,2)); scale=max(rall);
-feature=opts.MinimumPhysicalFeature; if isempty(feature), feature=max(1e-9*scale,1e3*eps(scale)); end
+feature=opts.MinimumPhysicalFeature; if isempty(feature), feature=max(2e-6,1e-6*scale); end
 snap=opts.PartitionSnapTolerance; if isempty(snap), snap=2*feature; end
 % Region labels establish cumulative radial ordering independently for internal/external slots.
-labelr=sqrt(sum(geom.CoilLabelLocations.^2,2)); [~,ord]=sort(labelr);
+labelr=sqrt(sum(geom.CoilLabelLocations.^2,2)); [labelr,ord]=sort(labelr);
+if numel(labelr)>1, gap=median(diff(labelr)); else, gap=max(rall)-min(rall); end
+geom.CoilRadialBounds=[labelr(1)-gap/2,labelr(end)+gap/2];
 total=sum(a.LayerPackAreas); targets=(1:numel(ids))'*total/(numel(ids)+1);
 positions=zeros(numel(ids),1); iterations=zeros(numel(ids),1); adjusted=false; reasons={}; snapped={};
 partitionR=zeros(numel(ids),1);
@@ -77,6 +80,7 @@ for q=1:numel(ids)
     end
     lo=max(ranges(:,1))+feature; hi=min(ranges(:,2))-feature;
     if q>1, lo=max(lo,positions(q-1)+feature); end
+    if q<numel(ids), hi=min(hi,partitionR(q+1)-feature); end
     [glo,oklo]=candidateAtRadius(geom,edgeId,lo); [ghi,okhi]=candidateAtRadius(geom,edgeId,hi);
     if ~(oklo&&okhi), error('rnfoundry:geometry:NoSafePartition','No valid divider bracket exists.'); end
     flo=cumulativeArea(glo,ord,q)-target; fhi=cumulativeArea(ghi,ord,q)-target;
@@ -110,13 +114,28 @@ for z=1:2
     if isempty(rrts), ok=false; return; end
     t=rrts(1); g.Nodes(n,:)=p(1,:)+t*v; g.BoundaryChordAttachments(row,4)=t;
 end
-g=refreshGeometry(g,eid); g=relabelRegions(g);
+g=refreshGeometry(g,eid); g=relabelRegions(g); g=synchronizeCoordinates(g);
 end
 function g=relabelRegions(g)
 pr=[g.Edges(g.PartitionEdgeIds).Radius];
 if isempty(pr), return; end
-lr=sqrt(sum(g.CoilLabelLocations.^2,2)); [~,oo]=sort(lr); br=[min(sqrt(sum(g.AuthoritativeBoundaryNodes.^2,2))),sort(pr),max(sqrt(sum(g.AuthoritativeBoundaryNodes.^2,2)))];
+lr=sqrt(sum(g.CoilLabelLocations.^2,2)); [~,oo]=sort(lr); br=[g.CoilRadialBounds(1),sort(pr),g.CoilRadialBounds(2)];
 for kk=1:numel(oo), ang=atan2(g.CoilLabelLocations(oo(kk),2),g.CoilLabelLocations(oo(kk),1)); rad=mean(br(kk:kk+1)); g.CoilLabelLocations(oo(kk),:)=[rad*cos(ang),rad*sin(ang)]; end
+g.SlotInfo.coillabelloc=g.CoilLabelLocations;
+end
+
+function g=synchronizeCoordinates(g)
+% Keep every current Cartesian/polar/local representation coherent while
+% retaining explicitly named frozen legacy-local coordinates.
+oldR=g.MappedRadialNodes(:,1); oldLocal=g.LocalNodes(:,1);
+[theta,radius]=cart2pol(g.Nodes(:,1),g.Nodes(:,2));
+signMap=1; c=corrcoef(oldR,oldLocal); if numel(c)>=4 && c(1,2)<0, signMap=-1; end
+g.LocalNodes(:,1)=oldLocal+signMap*(radius-oldR); g.LocalNodes(:,2)=theta;
+g.RadialNodes=[radius,theta]; g.MappedRadialNodes=g.RadialNodes;
+oldLR=sqrt(sum(g.RadialCoilLabelLocations.^2,2)); oldLL=g.LocalCoilLabelLocations(:,1);
+[lt,lr]=cart2pol(g.CoilLabelLocations(:,1),g.CoilLabelLocations(:,2));
+g.LocalCoilLabelLocations(:,1)=oldLL+signMap*(lr-oldLR);
+g.LocalCoilLabelLocations(:,2)=lt; g.RadialCoilLabelLocations=[lr,lt];
 g.SlotInfo.coillabelloc=g.CoilLabelLocations;
 end
 function g=refreshGeometry(g,dividerId)
