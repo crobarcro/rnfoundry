@@ -17,6 +17,21 @@ deterministically rather than emitting a malformed face. Diagnostics report mode
 targets, achieved areas, iterations, positions, imbalance, and minimum feature
 measurements.
 
+<<<<<<< ours
+=======
+Candidate acceptance is local to features created or shortened by the divider:
+the two authoritative chord fragments, separation from other authoritative
+boundary nodes, refreshed divider-adjacent line/arc lengths, and the divider
+length. Existing unrelated small perimeter features do not become invalid merely
+because the partition policy is enabled. If the ideal root enters the snap band,
+bounded nearby candidates are tested and the safe candidate with the least area
+error is retained. Diagnostics identify the limiting divider endpoint, chord, and
+authoritative endpoint. The deterministic regression scales the established
+base/body fixture by `0.0042`; its ideal divider approaches lower endpoint node 111
+of authoritative chord 1-111, and the default 2 um feature/4 um snap policy moves
+it to a placement with a chord fragment just over 4 um.
+
+>>>>>>> theirs
 Divider locations are solved on uninsulated geometry and then frozen when explicit
 insulation geometry is constructed. Canonical `LayerPackAreas` are usable
 post-insulation areas, `TotalPackArea=sum(LayerPackAreas)`, and
@@ -35,4 +50,14 @@ Legacy `CoilArea`/`PackArea` build inputs are accepted as deprecated ignored inp
 and cannot override exact geometry. Issue #5C remains: magnetic preparation still
 consumes raw FEA coil-area diagnostics and is intentionally unchanged here.
 
+<<<<<<< ours
 Construction seeds a directed boundary walk from the single known ordinary divider and integrates only the two adjacent slot-region loops with `radialslotcumulativearea`. It performs no arbitrary face discovery, polygon construction, `inpolygon`, or label assignment. Construction and the independent public analyzer share `greenareaedge` for exact line and general non-origin-centred circular-arc contributions; `radialslotregions` invokes the public analyzer only after construction.
+=======
+Construction seeds a directed boundary walk from the single known ordinary divider
+and integrates only the two adjacent slot-region loops with
+`radialslotcumulativearea`. It performs no arbitrary face discovery, polygon
+construction, `inpolygon`, or label assignment. Construction and the independent
+public analyzer share `greenareaedge` for exact line and general non-origin-centred
+circular-arc contributions; `radialslotregions` invokes the public analyzer only
+after construction.
+>>>>>>> theirs

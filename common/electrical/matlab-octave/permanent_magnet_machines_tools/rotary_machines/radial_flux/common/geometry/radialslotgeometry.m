@@ -94,13 +94,17 @@ for q=1:numel(ids)
         if flo*fm<=0, hi=mid; fhi=fm; else, lo=mid; flo=fm; end %#ok<NASGU>
     end
     idealPositions(q)=mid;
-    clearance=partitionClearance(gm,edgeId);
-    if clearance<feature || clearance<snap
-        steps=feature*[1 2 4 8 16]; candidates=reshape([mid-steps;mid+steps],1,[]); best=[]; besterr=Inf; bestpos=NaN;
+    idealMetrics=partitionFeatureMetrics(gm,edgeId);
+    if idealMetrics.MinimumFeature<feature || idealMetrics.MinimumFeature<snap
+        firstStep=max(feature/100,snap-idealMetrics.MinimumFeature+feature/100);
+        steps=unique([firstStep*[1 2 4 8 16],feature*[1 2 4 8 16]]);
+        candidates=reshape([mid-steps;mid+steps],1,[]); best=[]; besterr=Inf; bestpos=NaN;
         for cc=1:numel(candidates)
             if candidates(cc)<=safeLo || candidates(cc)>=safeHi, continue; end
             [gc,ok]=candidateAtRadius(geom,edgeId,candidates(cc));
-            if ok && partitionClearance(gc,edgeId)>=feature
+            if ~ok, continue; end
+            candidateMetrics=partitionFeatureMetrics(gc,edgeId);
+            if candidateMetrics.MinimumFeature>=max(feature,snap)
                 err=abs(cumulativeArea(gc,ord,q)-target);
                 if err<besterr, best=gc; besterr=err; bestpos=candidates(cc); end
             end
@@ -108,7 +112,7 @@ for q=1:numel(ids)
         if isempty(best), error('rnfoundry:geometry:NoSafePartition','No topology-safe divider placement exists in the valid bracket.'); end
         gm=best; mid=bestpos; adjusted=true;
         reasons{end+1}='ideal divider was inside the physical feature-clearance band'; %#ok<AGROW>
-        snapped{end+1}='nearest safe chord location'; %#ok<AGROW>
+        snapped{end+1}=idealMetrics.LimitingFeature; %#ok<AGROW>
     end
     positions(q)=mid; iterations(q)=it; geom=gm;
 end
@@ -117,19 +121,72 @@ diag=makeDiagnostics('equal-physical-area',achieved,targets,iterations,adjusted,
 diag.IdealPartitionPositions=idealPositions; diag.PartitionPositions=positions; diag.MinimumNodeSeparation=geom.MinimumNodeSeparation;
 diag.MinimumStraightEdgeLength=geom.MinimumStraightSegmentLength;
 diag.MinimumArcLength=geom.MinimumArcLength; diag.MinimumDividerSpacing=minimumDiff(positions);
+diag.PartitionFeatureMetrics=partitionFeatureMetrics(geom,ids(1));
 end
 function value=cumulativeArea(g,ord,q) %#ok<INUSD>
 value=radialslotcumulativearea(g,g.PartitionEdgeIds,'inner');
 end
-function value=partitionClearance(g,eid)
-value=Inf; ids=g.Edges(eid).NodeIds;
+function metrics=partitionFeatureMetrics(g,eid)
+% Measure only geometry created or shortened by this divider.  Unrelated
+% small features on the authoritative one-layer perimeter are deliberately
+% outside the Issue-5B partition policy.
+ids=g.Edges(eid).NodeIds;
+minimumChord=Inf; minimumNearby=Inf; minimumAffected=Inf;
+limiting=struct('Value',Inf,'Description','');
 for zz=1:2
  row=find(g.BoundaryChordAttachments(:,1)==ids(zz),1);
- if isempty(row), value=0; return; end
+ if isempty(row)
+  error('rnfoundry:geometry:NoSafePartition','Divider endpoint has no authoritative chord attachment.');
+ end
  pair=g.BoundaryChordAttachments(row,2:3); p=g.AuthoritativeBoundaryNodes(pair,:);
- value=min(value,min(sqrt(sum((p-g.Nodes(ids(zz),:)).^2,2))));
+ fragments=sqrt(sum((p-g.Nodes(ids(zz),:)).^2,2));
+ [distance,side]=min(fragments); minimumChord=min(minimumChord,distance);
+ endpointName='lower';
+ pairR=sqrt(sum(p.^2,2)); if pairR(side)==max(pairR), endpointName='upper'; end
+ description=sprintf('divider endpoint %d near %s endpoint node %d of authoritative chord %d-%d', ...
+                     zz,endpointName,pair(side),pair(1),pair(2));
+ limiting=chooseLimiting(limiting,distance,description);
+
+ % Check the moved endpoint against other authoritative nodes, excluding
+ % its own chord endpoints which are already represented by the fragments.
+ relevant=setdiff(1:size(g.AuthoritativeBoundaryNodes,1),pair);
+ if ~isempty(relevant)
+  distances=sqrt(sum((g.AuthoritativeBoundaryNodes(relevant,:)-g.Nodes(ids(zz),:)).^2,2));
+  [distance,index]=min(distances); minimumNearby=min(minimumNearby,distance);
+  description=sprintf('divider endpoint %d near authoritative boundary node %d',zz,relevant(index));
+  limiting=chooseLimiting(limiting,distance,description);
+ end
+
+ % Only primitives incident on a moved endpoint can be shortened by the
+ % candidate.  Their refreshed exact line/arc lengths are therefore the
+ % local affected-edge metric.
+ incident=find(arrayfun(@(edge) any(edge.NodeIds==ids(zz)),g.Edges));
+ incident=setdiff(incident,eid);
+ if ~isempty(incident)
+  lengths=[g.Edges(incident).Length]; [distance,index]=min(lengths);
+  minimumAffected=min(minimumAffected,distance);
+  description=sprintf('divider endpoint %d adjacent primitive %d',zz,incident(index));
+  limiting=chooseLimiting(limiting,distance,description);
+ end
 end
-value=min(value,g.Edges(eid).Length);
+dividerLength=g.Edges(eid).Length;
+limiting=chooseLimiting(limiting,dividerLength,sprintf('divider primitive %d',eid));
+metrics=struct('MinimumFeature',limiting.Value, ...
+               'MinimumChordFragmentLength',minimumChord, ...
+               'MinimumNearbyBoundaryNodeSeparation',minimumNearby, ...
+               'MinimumAffectedPrimitiveLength',minimumAffected, ...
+               'DividerLength',dividerLength, ...
+               'LimitingFeature',limiting.Description);
+end
+function limiting=chooseLimiting(limiting,value,description)
+if ~isfinite(limiting.Value)
+ tieTolerance=0;
+else
+ tieTolerance=64*eps(max([1,abs(value),abs(limiting.Value)]));
+end
+if value<limiting.Value-tieTolerance
+ limiting.Value=value; limiting.Description=description;
+end
 end
 function [g,ok]=candidateAtRadius(g,eid,r)
 ids=g.Edges(eid).NodeIds; ok=true;

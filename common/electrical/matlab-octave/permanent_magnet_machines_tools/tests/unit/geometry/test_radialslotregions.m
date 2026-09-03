@@ -215,17 +215,29 @@ for id=g.PartitionEdgeIds
 end
 end
 
-function test_equal_area_adjustment_diagnostics_are_real()
-args={[.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
-    'NWindingLayers',2,'MinimumPhysicalFeature',2e-6,'PartitionSnapTolerance',.1};
+function test_equal_area_near_base_transition_adjusts_safely()
+% Scale a characterized base/body-transition fixture so that its ideal
+% root is naturally inside the default 4 um snap band.  Tol is scaled with
+% the geometry; the Issue-5B physical feature controls remain at defaults.
+scale=0.0042;
+args={[.075 .095],.016*scale,.024*scale,.052*scale,.009*scale, ...
+    .004*scale,.48*scale,'o','NWindingLayers',2, ...
+    'CoilBaseFraction',.52,'Tol',1e-8};
 g=radialslotregions(args{:}); h=radialslotregions(args{:});
-assertTrue(g.PartitionDiagnostics.Adjusted);
-assertTrue(~isempty(g.PartitionDiagnostics.AdjustmentReason));
-assertTrue(~isempty(g.PartitionDiagnostics.SnappedFeature));
-assertTrue(isfinite(g.PartitionDiagnostics.RelativeAreaImbalance));
-assertTrue(g.PartitionDiagnostics.RelativeAreaImbalance<2e-4);
-assertTrue(g.MinimumNodeSeparation>=2e-6);
-assertEqual(g.Nodes,h.Nodes); assertEqual(g.PartitionDiagnostics,h.PartitionDiagnostics);
+d=g.PartitionDiagnostics;
+assertTrue(d.Adjusted);
+assertTrue(~isempty(d.AdjustmentReason));
+assertTrue(~isempty(d.SnappedFeature));
+assertTrue(~isempty(strfind(d.SnappedFeature{1}, ...
+    'divider endpoint 1 near lower endpoint node 111 of authoritative chord 1-111'))); %#ok<STREMP>
+assertTrue(isfinite(d.IdealPartitionPositions));
+assertTrue(isfinite(d.PartitionPositions));
+assertTrue(d.IdealPartitionPositions~=d.PartitionPositions);
+assertTrue(isfinite(d.RelativeAreaImbalance));
+assertTrue(d.RelativeAreaImbalance<0.02);
+assertTrue(d.PartitionFeatureMetrics.MinimumFeature>=4e-6);
+assertTrue(d.PartitionFeatureMetrics.MinimumChordFragmentLength>=4e-6);
+assertEqual(g.Nodes,h.Nodes); assertEqual(d,h.PartitionDiagnostics);
 end
 
 function test_equal_area_higher_layers_fail_explicitly()
