@@ -4,7 +4,7 @@ initTestSuite;
 end
 function test_ordinary_radial_layers_have_fixed_external_boundary()
 for side=['o','i']
-    g1=fixture(side,1,false,false); g2=fixture(side,2,false,false); g3=fixture(side,3,false,false);
+    g1=fixture(side,1,false,false); g2=fixture(side,2,false,false); g3=fixtureMode(side,3,false,false,'legacy-local');
     assertScaleEqual(g2.TotalPackArea,g1.TotalPackArea);
     assertScaleEqual(g3.TotalPackArea,g1.TotalPackArea);
     assertBoundaryEqual(g1,g2); assertBoundaryEqual(g1,g3);
@@ -14,7 +14,7 @@ for side=['o','i']
 end
 end
 function test_legacy_partition_positions_remain_physically_unequal()
-ge=fixture('o',2,false,false); gi=fixture('i',2,false,false);
+ge=fixtureMode('o',2,false,false,'legacy-local'); gi=fixtureMode('i',2,false,false,'legacy-local');
 assertElementsAlmostEqual(ge.LayerPackAreas,[.001178404114275779;.001241968301635460],'absolute',3e-15);
 assertElementsAlmostEqual(gi.LayerPackAreas,[.001069027610527237;.001003888643539117],'absolute',3e-15);
 % The total perimeter is now fixed; equal physical-area placement is #5B.
@@ -26,7 +26,7 @@ ge=fixture('o',1,false,false); gi=fixture('i',1,false,false);
 assertElementsAlmostEqual(ge.TotalPackArea,.002420372415911237,'absolute',3e-15);
 assertElementsAlmostEqual(gi.TotalPackArea,.002072916254066352,'absolute',3e-15);
 for side=['o','i']
-    g1=fixture(side,1,false,true); g2=fixture(side,2,false,true); g3=fixture(side,3,false,true);
+    g1=fixture(side,1,false,true); g2=fixture(side,2,false,true); g3=fixtureMode(side,3,false,true,'legacy-local');
     assertScaleEqual(g2.TotalPackArea,g1.TotalPackArea);
     assertScaleEqual(g3.TotalPackArea,g1.TotalPackArea);
     assertBoundaryEqual(g1,g2); assertBoundaryEqual(g1,g3);
@@ -41,7 +41,7 @@ assertElementsAlmostEqual(g.LayerPackAreas(1),g.LayerPackAreas(2),'absolute',2e-
 assertScaleEqual(g.TotalPackArea,g1.TotalPackArea);
 end
 function test_primitives_topology_features_and_determinism()
-g=fixture('o',3,false,false); h=fixture('o',3,false,false);
+g=fixtureMode('o',3,false,false,'legacy-local'); h=fixtureMode('o',3,false,false,'legacy-local');
 assertEqual(g.Nodes,h.Nodes); assertEqual(g.LayerPackAreas,h.LayerPackAreas);
 assertTrue(all(isfinite(g.Nodes(:)))); assertTrue(g.MinimumNodeSeparation>0);
 assertTrue(g.MinimumEdgeLength>1e-6); assertTrue(any(strcmp({g.Edges.Type},'arc')));
@@ -63,9 +63,12 @@ function assertScaleEqual(a,b)
 assertTrue(abs(a-b)<=max(2e-15,2e-12*max(abs([a b]))));
 end
 function g=fixture(side,layers,split,insulated)
+g=fixtureMode(side,layers,split,insulated,'equal-physical-area');
+end
+function g=fixtureMode(side,layers,split,insulated,mode)
 g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,side, ...
  'NWindingLayers',layers,'SplitSlot',split,'DrawCoilInsulation',insulated, ...
- 'CoilInsulationThickness',.0006);
+ 'CoilInsulationThickness',.0006,'LayerPartitionMode',mode);
 end
 
 function test_coordinate_frames_and_internal_external_mapping()
@@ -75,18 +78,21 @@ for side=['o','i']
     assertElementsAlmostEqual(g.Nodes(:,2),g.RadialNodes(:,1).*sin(g.RadialNodes(:,2)),'absolute',2e-15);
     assertElementsAlmostEqual(g.CoilLabelLocations(:,1), ...
         g.RadialCoilLabelLocations(:,1).*cos(g.RadialCoilLabelLocations(:,2)),'absolute',2e-15);
+    assertElementsAlmostEqual(g.RadialCoilLabelLocations(:,2),g.LocalCoilLabelLocations(:,2),'absolute',2e-15);
     if side=='o'
         assertElementsAlmostEqual(g.MappedRadialNodes(:,1),g.LocalNodes(:,1)+.48,'absolute',2e-15);
+        assertElementsAlmostEqual(g.RadialCoilLabelLocations(:,1),g.LocalCoilLabelLocations(:,1)+.48,'absolute',2e-15);
     else
         assertElementsAlmostEqual(g.MappedRadialNodes(:,1),.48-g.LocalNodes(:,1),'absolute',2e-15);
+        assertElementsAlmostEqual(g.RadialCoilLabelLocations(:,1),.48-g.LocalCoilLabelLocations(:,1),'absolute',2e-15);
     end
     assertEqual(g.SlotInfo.coillabelloc,g.CoilLabelLocations);
-    assertEqual(g.LegacySlotInfo.coillabelloc,g.LocalCoilLabelLocations);
+    assertEqual(g.LegacySlotInfo.coillabelloc,g.LegacyLocalCoilLabelLocations);
 end
 end
 function test_divider_arcs_remain_valid_after_chord_attachment()
 for side=['o','i']
-    g=fixture(side,3,false,false);
+    g=fixtureMode(side,3,false,false,'legacy-local');
     assertEqual(numel(g.PartitionEdgeIds),2);
     for id=g.PartitionEdgeIds
         e=g.Edges(id); p=g.Nodes(e.NodeIds,:); radii=sqrt(sum(p.^2,2));
@@ -98,7 +104,7 @@ end
 end
 function test_every_arc_is_finite_nonzero_and_coradial()
 for side=['o','i']
-    g=fixture(side,3,false,true);
+    g=fixtureMode(side,3,false,true,'legacy-local');
     for id=find(strcmp({g.Edges.Type},'arc'))
         e=g.Edges(id); p=g.Nodes(e.NodeIds,:); r=sqrt(sum((p-e.ArcCenter).^2,2));
         assertTrue(abs(diff(r))<=max(1e-12,1e-10*max(r)));
@@ -138,13 +144,13 @@ expected=[1.01470569690398e-4,4.392e-3; ...
           1.154455680380752e-4,4.392e-3];
 for k=1:size(cases,1)
     g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
-        'NWindingLayers',cases{k,2},'CoilBaseFraction',cases{k,1});
+        'NWindingLayers',cases{k,2},'LayerPartitionMode','legacy-local','CoilBaseFraction',cases{k,1});
     assertElementsAlmostEqual(g.MinimumStraightSegmentLength,expected(k,1),'absolute',5e-15);
     assertElementsAlmostEqual(g.MinimumArcLength,expected(k,2),'absolute',5e-15);
     assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-3);
     assertTrue(g.MinimumPartitionEdgeLength>4e-2);
 end
-g=fixture('o',3,false,true);
+g=fixtureMode('o',3,false,true,'legacy-local');
 assertTrue(g.MinimumPartitionBoundarySegmentLength>1e-2);
 assertTrue(g.MinimumPartitionEdgeLength>4e-2);
 end
@@ -154,7 +160,7 @@ function test_targeted_partition_transition_proximity()
 % base/body end of the authoritative body chord, in both orientations.
 for side=['o','i']
     g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,side, ...
-        'NWindingLayers',2,'CoilBaseFraction',.5256);
+        'NWindingLayers',2,'LayerPartitionMode','legacy-local','CoilBaseFraction',.5256);
     assertEqual(g.BoundaryChordAttachments(:,2:3),[1 111;5 112]);
     assertTrue(g.MinimumPartitionBoundarySegmentLength>42e-6);
     assertTrue(g.MinimumPartitionBoundarySegmentLength<43e-6);
@@ -163,26 +169,26 @@ end
 % This curved-base partition is exactly the authoritative sampled node pair
 % 81/106, not merely an unspecified coincident boundary node.
 g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
-    'NWindingLayers',2,'CoilBaseFraction',.80);
+    'NWindingLayers',2,'LayerPartitionMode','legacy-local','CoilBaseFraction',.80);
 assertTrue(isempty(g.BoundaryChordAttachments));
 assertEqual(g.Edges(g.PartitionEdgeIds).NodeIds,[81 106]);
 assertPartitionEndpointsMatchBoundaryNodes(g,1e-14);
 % Tune a large-shoe fixture to 34.2 um from the body/shoe chord endpoint;
 % its second partition is explicitly the sampled shoe-node pair 14/39.
 g=radialslotregions([.075 .095],.005,.024,.052,.046,.001,.48,'o', ...
-    'NWindingLayers',3,'CoilBaseFraction',.02);
+    'NWindingLayers',3,'LayerPartitionMode','legacy-local','CoilBaseFraction',.02);
 assertTrue(g.MinimumPartitionBoundarySegmentLength>34e-6);
 assertTrue(g.MinimumPartitionBoundarySegmentLength<35e-6);
 assertEqual(g.BoundaryChordAttachments(end,2:3),[5 112]);
 % A separate large-shoe fixture identifies the authoritative sampled shoe
 % node pair 14/39 exactly.
 g=radialslotregions([.075 .095],.005,.024,.052,.08,.001,.48,'o', ...
-    'NWindingLayers',3,'CoilBaseFraction',.02);
+    'NWindingLayers',3,'LayerPartitionMode','legacy-local','CoilBaseFraction',.02);
 assertEqual(g.Edges(g.PartitionEdgeIds(2)).NodeIds,[14 39]);
 % An insulated eight-layer fixture approaches its known insulation-side
 % chord endpoints 176/192 within 2.5 um without snapping.
 g=radialslotregions([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
-    'NWindingLayers',8,'CoilBaseFraction',.504,'DrawCoilInsulation',true, ...
+    'NWindingLayers',8,'LayerPartitionMode','legacy-local','CoilBaseFraction',.504,'DrawCoilInsulation',true, ...
     'CoilInsulationThickness',.0006);
 assertTrue(any(all(g.BoundaryChordAttachments(:,2:3)==[114 176],2)));
 assertTrue(any(all(g.BoundaryChordAttachments(:,2:3)==[137 192],2)));
@@ -194,7 +200,7 @@ assertTrue(g.MinimumArcLength>4e-3); assertTrue(g.MinimumPartitionEdgeLength>3.9
 % A valid shallow 16-layer slot provides sub-millimetre neighbouring
 % ordinary dividers; the legacy generator rejects still denser variants.
 g=radialslotregions([.075 .095],.016,.024,.010,.004,.001,.48,'o', ...
-    'NWindingLayers',16,'CoilBaseFraction',.05);
+    'NWindingLayers',16,'LayerPartitionMode','legacy-local','CoilBaseFraction',.05);
 r=zeros(numel(g.PartitionEdgeIds),1);
 for k=1:numel(r), p=g.Nodes(g.Edges(g.PartitionEdgeIds(k)).NodeIds,:); r(k)=mean(sqrt(sum(p.^2,2))); end
 assertTrue(min(diff(sort(r)))>0.67e-3 && min(diff(sort(r)))<0.68e-3);
@@ -207,4 +213,34 @@ for id=g.PartitionEdgeIds
         assertTrue(min(d)<tol);
     end
 end
+end
+
+function test_equal_area_near_base_transition_adjusts_safely()
+% Scale a characterized base/body-transition fixture so that its ideal
+% root is naturally inside the default 4 um snap band.  Tol is scaled with
+% the geometry; the Issue-5B physical feature controls remain at defaults.
+scale=0.0042;
+args={[.075 .095],.016*scale,.024*scale,.052*scale,.009*scale, ...
+    .004*scale,.48*scale,'o','NWindingLayers',2, ...
+    'CoilBaseFraction',.52,'Tol',1e-8};
+g=radialslotregions(args{:}); h=radialslotregions(args{:});
+d=g.PartitionDiagnostics;
+assertTrue(d.Adjusted);
+assertTrue(~isempty(d.AdjustmentReason));
+assertTrue(~isempty(d.SnappedFeature));
+assertTrue(~isempty(strfind(d.SnappedFeature{1}, ...
+    'divider endpoint 1 near lower endpoint node 111 of authoritative chord 1-111'))); %#ok<STREMP>
+assertTrue(isfinite(d.IdealPartitionPositions));
+assertTrue(isfinite(d.PartitionPositions));
+assertTrue(d.IdealPartitionPositions~=d.PartitionPositions);
+assertTrue(isfinite(d.RelativeAreaImbalance));
+assertTrue(d.RelativeAreaImbalance<0.02);
+assertTrue(d.PartitionFeatureMetrics.MinimumFeature>=4e-6);
+assertTrue(d.PartitionFeatureMetrics.MinimumChordFragmentLength>=4e-6);
+assertEqual(g.Nodes,h.Nodes); assertEqual(d,h.PartitionDiagnostics);
+end
+
+function test_equal_area_higher_layers_fail_explicitly()
+assertExceptionThrown(@() radialslotgeometry([.075 .095],.016,.024,.052,.009,.004,.48,'o', ...
+    'NWindingLayers',3),'rnfoundry:geometry:UnsupportedLayerCount');
 end

@@ -84,15 +84,14 @@ for seed=1:2*ne
     for z=1:numel(ids)
         e=edges(ids(z)); ij=e.NodeIds; if ds(z)<0, ij=fliplr(ij); end
         p=nodes(ij,:);
+        area=area+greenareaedge(p,e,ds(z));
         if strcmp(e.Type,'arc')
             da=e.ArcAngle*ds(z); c=e.ArcCenter; r=e.Radius;
-            t0=atan2(p(1,2)-c(2),p(1,1)-c(1)); t1=t0+da;
-            area=area+0.5*(r*r*da + r*c(1)*(sin(t1)-sin(t0)) ...
-                                      - r*c(2)*(cos(t1)-cos(t0)));
+            t0=atan2(p(1,2)-c(2),p(1,1)-c(1));
             tt=t0+linspace(0,da,max(2,ceil(abs(da)/(pi/180))+1));
             pts=[c(1)+r*cos(tt(:)),c(2)+r*sin(tt(:))];
         else
-            area=area+0.5*(p(1,1)*p(2,2)-p(2,1)*p(1,2)); pts=p;
+            pts=p;
         end
         poly=[poly;pts(1:end-1,:)]; %#ok<AGROW>
     end

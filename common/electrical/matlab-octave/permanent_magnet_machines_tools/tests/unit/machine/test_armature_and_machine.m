@@ -40,3 +40,13 @@ e=makeExternalSlottedMachine(); f=makeInternalSlottedMachine().Field;
 assertExceptionThrown(@() rnfoundry.em.rotary.radial.SlottedPMMachine(f,e.Armature,e.ls), ...
     'rnfoundry:em:InvalidFieldOrientation');
 end
+
+function test_shoe_curve_default_and_round_trip()
+a=makeExternalSlottedMachine().Armature; s=a.toStruct(); s.Winding=a.Winding; s.IronMaterial=a.IronMaterial; s=rmfield(s,'ShoeCurveControlFrac');
+defaulted=rnfoundry.em.rotary.radial.SlottedArmature(s);
+assertEqual(defaulted.ShoeCurveControlFrac,0.5);
+s.ShoeCurveControlFrac=0.37; explicit=rnfoundry.em.rotary.radial.SlottedArmature(s);
+assertEqual(explicit.ShoeCurveControlFrac,0.37);
+r=rnfoundry.em.rotary.radial.SlottedArmature.fromStruct(explicit.toStruct());
+assertEqual(r.ShoeCurveControlFrac,0.37);
+end

@@ -38,3 +38,17 @@ assertTrue(isa(w.CoilGeometry,'rnfoundry.em.winding.RadialSlottedCoilGeometry'))
 r=rnfoundry.em.winding.Winding.fromStruct(w.toStruct());
 assertEqual(r.toStruct(),w.toStruct());
 end
+
+function test_radial_geometry_schema_compatibility()
+g=rnfoundry.em.winding.RadialSlottedCoilGeometry([2.5e-4;2.4e-4],0.1,0.08,0.012,[0.1,0.1],0.2e-3);
+s=g.toStruct(); r=rnfoundry.em.winding.RadialSlottedCoilGeometry.fromStruct(s);
+assertEqual(r.LayerPackAreas,g.LayerPackAreas); assertEqual(r.TotalPackArea,sum(g.LayerPackAreas));
+assertEqual(r.PackArea,min(g.LayerPackAreas));
+v1=rmfield(s,{'LayerPackAreas','TotalPackArea'}); v1.SchemaVersion=1;
+r=rnfoundry.em.winding.RadialSlottedCoilGeometry.fromStruct(v1);
+assertEqual(r.LayerPackAreas,v1.PackArea);
+bad=s; bad.PackArea=bad.PackArea*0.9;
+assertExceptionThrown(@() rnfoundry.em.winding.RadialSlottedCoilGeometry.fromStruct(bad),'rnfoundry:em:InconsistentPackArea');
+bad=s; bad.TotalPackArea=bad.TotalPackArea*0.9;
+assertExceptionThrown(@() rnfoundry.em.winding.RadialSlottedCoilGeometry.fromStruct(bad),'rnfoundry:em:InconsistentPackArea');
+end

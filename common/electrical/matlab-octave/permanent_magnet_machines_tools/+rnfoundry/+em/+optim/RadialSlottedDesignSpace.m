@@ -4,15 +4,14 @@ classdef RadialSlottedDesignSpace
     %   deliberately separate infeasible optimisation state from canonical
     %   physical state. Repair independently reproduces the deterministic
     %   legacy ordering; chrom2design_RADIAL_SLOTTED is only a test oracle.
-    %   build has no FEA responsibility and requires BUILDDATA.PackArea (or
-    %   CoilArea); Hc*Wc is never used as canonical coil pack area.
+    %   build has no FEA responsibility; exact pack area comes from geometry.
     properties (SetAccess = private)
         Options
         SimOptions
     end
     methods
         function obj = RadialSlottedDesignSpace(options, simoptions)
-            defaults = struct('Phases',3,'qc',fr(3,3),'yd',4, ...
+            defaults = struct('Phases',3,'qc',1,'yd',4, ...
                 'UseResistanceRatio',true,'RlVRp',10,'LoadResistance',1, ...
                 'tc2Vtc1',0.1,'CoilFillFactor',0.65,'NStrands',1, ...
                 'BranchFac',0,'ArmatureType','internal','CoilLayers',2, ...
@@ -76,15 +75,8 @@ classdef RadialSlottedDesignSpace
             if ~candidate.IsRepaired, error('rnfoundry:em:UnrepairedCandidate','Repair candidate before build.'); end
             if nargin<3, buildData=struct(); end
             d=candidate.toLegacyStruct();
-            if isfield(buildData,'PackArea') && isfield(buildData,'CoilArea')
-                scale=max(1,abs(buildData.PackArea));
-                if abs(buildData.PackArea-buildData.CoilArea)>1e-12*scale
-                    error('rnfoundry:em:ConflictingPackArea','PackArea and CoilArea disagree.');
-                end
-            end
-            if isfield(buildData,'PackArea'), d.CoilArea=buildData.PackArea;
-            elseif isfield(buildData,'CoilArea'), d.CoilArea=buildData.CoilArea;
-            else, error('rnfoundry:em:MissingPackArea','buildData.PackArea or CoilArea is required.'); end
+            % Legacy PackArea/CoilArea inputs are accepted but are diagnostic only;
+            % authoritative canonical areas are always derived geometrically.
             names=fieldnames(buildData);
             allowed={'PackArea','CoilArea','CoilInsulationThickness', ...
                 'WindingLayout','MagFEASimMaterials','CoilTurns'};
@@ -92,7 +84,7 @@ classdef RadialSlottedDesignSpace
                 if ~any(strcmp(names{k},allowed))
                     error('rnfoundry:em:UnsupportedBuildData','Unsupported buildData field %s.',names{k});
                 end
-                if ~strcmp(names{k},'PackArea'), d.(names{k})=buildData.(names{k}); end
+                if ~any(strcmp(names{k},{'PackArea','CoilArea'})), d.(names{k})=buildData.(names{k}); end
             end
             machine=rnfoundry.em.rotary.radial.SlottedPMMachine.fromLegacyStruct(d);
         end
